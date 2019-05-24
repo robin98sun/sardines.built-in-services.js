@@ -8,7 +8,7 @@ export interface TableStructure {
     PRIMARY?: string[]
     CHECK?: string
     REFERENCES?: string
-    [column: string]: string|string[]|undefined
+    [column: string]: any
 }
 
 export interface DatabaseStructure {
@@ -93,6 +93,43 @@ export class Database extends StorageBase {
         return (typeof this.structure[table] !== 'undefined')
     }
 
+    private async createCompositeType(typeName: string, definition: TableStructure): Promise<any> {
+        let SQL = null
+        for (let col in definition) {
+            if (DDLKeywords[col.toUpperCase()]) continue
+            if (!SQL) SQL = `CREATE TYPE ${typeName} AS (`
+            const type = definition[col]
+            if (typeof type === 'string') {
+                SQL += ` ${col} ${type}, `
+            } else if (Array.isArray(type)) {
+                if (type.length > 1) continue
+                const subType = type[0]
+                if (typeof subType === 'string') {
+                    SQL += ` ${col} ${subType}[], `
+                } else if (Array.isArray(subType)) continue
+                else {
+                    const subTypeName = `${typeName}_${col}`
+                    await this.createCompositeType(subTypeName, subType)
+                    SQL += ` ${col} ${subTypeName}[], `
+                }                
+            } else {
+                const subTypeName = `${typeName}_${col}`
+                await this.createCompositeType(subTypeName, type)
+                SQL += ` ${col} ${subTypeName}, `
+            }
+        }
+        if (SQL) {
+            SQL = SQL.substr(0, SQL.length-2)
+            return await this.query(SQL)
+        } else {
+            throw utils.unifyErrMesg(
+                `Can not create composite type [${typeName}]`,
+                'postgres',
+                'table structure'
+            )
+        }
+    }
+
     private async createTable(table:string): Promise<any> {
         if (!this.hasTableDefinition(table)) {
             return Promise.reject(utils.unifyErrMesg(
@@ -108,7 +145,21 @@ export class Database extends StorageBase {
         for (let colName in tableStruct) {
             if (DDLKeywords[colName.toUpperCase()]) continue
             const colType = tableStruct[colName]
-            SQL += `${colName} ${colType}, `
+            if (typeof colType === 'string') {
+                SQL += `${colName} ${colType}, `
+            } else if (Array.isArray(colType) && colType.length !== 1) continue
+            else if (Array.isArray(colType) && typeof colType[0] === 'string') {
+                SQL += `${colName} ${colType[0]}[], `
+            } else if (Array.isArray(colType) && Array.isArray(colType[0])) continue
+            else if (Array.isArray(colType)) {
+                const subTypeName = `${table}_${colName}`
+                await this.createCompositeType(subTypeName, colType[0])
+                SQL += `${colName} ${subTypeName}[], `
+            } else if (!Array.isArray(colType) && typeof colType === 'object' && colType) {
+                const subTypeName = `${table}_${colName}`
+                await this.createCompositeType(subTypeName, colType)
+                SQL += `${colName} ${subTypeName}, `
+            }
         }
         if (SQL[SQL.length-1] !== ' ') throw utils.unifyErrMesg(`Table structure shall not be empty`, 'postgres', 'table structure')
         if (typeof tableStruct.CHECK !== 'undefined') {

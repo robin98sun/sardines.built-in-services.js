@@ -12,6 +12,8 @@ export interface StorageSettings {
     settings: PostgresSettings|any
 }
 
+export { StorageBase as StorageBaseClass } from './base'
+
 export {
     Database as PostgresSQL,
     ServerSettings as PostgresServerSettings,
@@ -19,25 +21,23 @@ export {
     TableStructure as PostgresTableStructure
 } from './postgresql'
 
-import { StorageBase } from './base'
 import * as utils from 'sardines-utils'
 
-export class Storage extends StorageBase {
-    private store: any
-    constructor(storageSettings: StorageSettings, databaseStructure?: any) {
-        super()
-        if (storageSettings.type.toLocaleLowerCase() === StorageType.Postgres && databaseStructure) {
-            this.store = new PostgresSQL(storageSettings.settings, databaseStructure)
-        }
+let storageInstance: any = null
+export const setup = (storageSettings: StorageSettings, databaseStructure?: any): PostgresSQL|any => {
+    if (storageInstance) return storageInstance
+    if (storageSettings.type.toLocaleLowerCase() === StorageType.Postgres && databaseStructure) {
+        storageInstance = new PostgresSQL(storageSettings.settings, databaseStructure)
     }
+    return storageInstance
+}
 
-    async get(table:string, identities?: any): Promise<any> {
-        if (this.store) return await this.store.get(table, identities)
-        else throw utils.unifyErrMesg('Storage has not been initialized', utils.logo, 'storage')
-    }
+export const get = async (table:string, identities?: any): Promise<any> => {
+    if (storageInstance) return await storageInstance.get(table, identities)
+    else throw utils.unifyErrMesg('Storage is not setup yet', utils.logo, 'storage')
+}
 
-    async set(table:string, obj: any, identities?: any): Promise<any> {
-        if (this.store) return await this.store.set(table, obj, identities)
-        else throw utils.unifyErrMesg('Storage has not been initialized', utils.logo, 'storage')
-    }
+export const set = async (table:string, obj: any, identities?: any): Promise<any> => {
+    if (storageInstance) return await storageInstance.set(table, obj, identities)
+    else throw utils.unifyErrMesg('Storage is not setup yet', utils.logo, 'storage')
 }
