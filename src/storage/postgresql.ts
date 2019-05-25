@@ -97,7 +97,7 @@ export class Database extends StorageBase {
         let SQL = null
         for (let col in definition) {
             if (DDLKeywords[col.toUpperCase()]) continue
-            if (!SQL) SQL = `CREATE TYPE ${typeName} AS (`
+            if (!SQL) SQL = `CREATE TYPE ${this.settings.schema?this.settings.schema+'.':''}${typeName} AS (`
             const type = definition[col]
             if (typeof type === 'string') {
                 SQL += ` ${col} ${type}, `
@@ -110,16 +110,19 @@ export class Database extends StorageBase {
                 else {
                     const subTypeName = `${typeName}_${col}`
                     await this.createCompositeType(subTypeName, subType)
-                    SQL += ` ${col} ${subTypeName}[], `
+                    SQL += ` ${col} ${this.settings.schema?this.settings.schema+'.':''}${subTypeName}[], `
+                    // SQL += ` ${col} ${subTypeName}[], `
                 }                
             } else {
                 const subTypeName = `${typeName}_${col}`
                 await this.createCompositeType(subTypeName, type)
-                SQL += ` ${col} ${subTypeName}, `
+                SQL += ` ${col} ${this.settings.schema?this.settings.schema+'.':''}${subTypeName}, `
+                // SQL += ` ${col} ${subTypeName}, `
             }
         }
         if (SQL) {
             SQL = SQL.substr(0, SQL.length-2)
+            SQL += ');'
             return await this.query(SQL)
         } else {
             throw utils.unifyErrMesg(
@@ -154,11 +157,13 @@ export class Database extends StorageBase {
             else if (Array.isArray(colType)) {
                 const subTypeName = `${table}_${colName}`
                 await this.createCompositeType(subTypeName, colType[0])
-                SQL += `${colName} ${subTypeName}[], `
+                SQL += `${colName} ${this.settings.schema?this.settings.schema+'.':''}${subTypeName}[], `
+                // SQL += `${colName} ${subTypeName}[], `
             } else if (!Array.isArray(colType) && typeof colType === 'object' && colType) {
                 const subTypeName = `${table}_${colName}`
                 await this.createCompositeType(subTypeName, colType)
-                SQL += `${colName} ${subTypeName}, `
+                SQL += `${colName} ${this.settings.schema?this.settings.schema+'.':''}${subTypeName}, `
+                // SQL += `${colName} ${subTypeName}, `
             }
         }
         if (SQL[SQL.length-1] !== ' ') throw utils.unifyErrMesg(`Table structure shall not be empty`, 'postgres', 'table structure')
@@ -205,7 +210,7 @@ export class Database extends StorageBase {
     }
 
     // DML 
-    private getColumnType(table: string, colName: string): string {
+    private getColumnType(table: string, colName: string): any {
         const tableStruct = this.structure[table]
         if (!tableStruct) {
             throw utils.unifyErrMesg(`Do not have table structure for table [${table}]`, 'postgres', 'database structure')
@@ -213,34 +218,80 @@ export class Database extends StorageBase {
         const colType = tableStruct[colName]
         if (typeof colType === 'undefined') {
             throw utils.unifyErrMesg(`Invalid column [${colName}], which is not defined in the table structure of table [${table}]`, 'postgres', 'sql statement')
-        } else if (typeof colType !== 'string') {
-            throw utils.unifyErrMesg(`Invalid column definition for column [${colName}] in table [${table}]`, 'postgres', 'table structure')
-        } else if (colType.toUpperCase() === 'CONSTRAINTS') {
+        // } else if (typeof colType !== 'string') {
+            // throw utils.unifyErrMesg(`Invalid column definition for column [${colName}] in table [${table}]`, 'postgres', 'table structure')
+        } else if (typeof colType === 'string' && colType.toUpperCase() === 'CONSTRAINTS') {
             throw utils.unifyErrMesg(`Invalid column name [${colName}] for table [${table}], which is a reserved keyword`, 'postgres', 'sql statement')
         }
-        return colType.toUpperCase()
+        if (typeof colType === 'string') return colType.toUpperCase()
+        else return colType
+    }
+
+    private composeValueForSQLStatement = (colType: any, value: any, tableName: string, colName: string): string => {
+        let result = ''
+        if (typeof colType === 'string') {
+            if (colType.indexOf('[]') < 0) {
+                switch (typeof value) {
+                    case 'object':
+                    if (colType === 'JSONB' || colType === 'JSON') {
+                        result = `'${JSON.stringify(value)}'`
+                        result += `::${colType}`
+                    } else if (colType === 'POINT') {
+                        // TODO
+                    }
+                    break
+            
+                    case 'string':
+                    if (value in builtInFunctions) result = value
+                    else result = `'${value}'`
+                    break
+            
+                    default:
+                    result = `${value}`
+                    break
+                }
+            } else if (Array.isArray(value)) {
+                result = 'ARRAY['
+                const subColType = colType.substr(0, colType.indexOf('[]'))
+
+                for(let i = 0; i<value.length ; i++) {
+                    const item = value[i]
+                    result += this.composeValueForSQLStatement(subColType, item, tableName, colName)
+                    if (i < value.length - 1) result += ', '
+                }
+                result += ']'
+            }
+        } else if (typeof colType === 'object') {
+            // Composite Type
+            if (Array.isArray(colType) && colType.length === 1 && Array.isArray(value)) {
+                result = 'ARRAY['
+                const compositeType = colType[0]
+                for(let i = 0; i<value.length ; i++) {
+                    const item = value[i]
+                    result += this.composeValueForSQLStatement(compositeType, item, tableName, colName)
+                    if (i < value.length - 1) result += ', '
+                }
+                result += ']' 
+            } else if (!Array.isArray(colType) && !Array.isArray(value) && typeof value === 'object') {
+                result = 'ROW('
+                for (let key in colType) {
+                    const subType = colType[key]
+                    if (key in value) {
+                        const subValue = this.composeValueForSQLStatement(subType, value[key], tableName, `${colName}_${key}`)
+                        result += subValue
+                    }
+                    result += ', '
+                }
+                if (result.substr(-2) === ', ') result = result.substr(0, result.length - 2)
+                result += `)::${this.settings.schema?this.settings.schema+'.':''}${tableName}_${colName}`
+            }
+        }
+        return result
     }
     
     private parseValueForSQLStatement = (table: string, colName: string, value: any): string => {
         const colType = this.getColumnType(table, colName)
-        let result = ''
-        switch (typeof value) {
-            case 'object':
-            // result = `'${JSON.stringify(value).replace(/'/g, '"')}'`
-            result = `'${JSON.stringify(value)}'`
-            if (colType === 'JSONB') result += '::jsonb'
-            break
-    
-            case 'string':
-            if (value in builtInFunctions) result = value
-            else result = `'${value}'`
-            break
-    
-            default:
-            result = `${value}`
-            break
-        }
-        return result
+        return this.composeValueForSQLStatement(colType, value, table, colName)
     }
 
     private parseIdentities (table: string, identities: any) {
@@ -298,20 +349,43 @@ export class Database extends StorageBase {
             if (!tableExists) await this.createTable(table)
 
             SQL = `INSERT INTO ${fullTableName} (`
-            for (let key in obj) {
-                SQL += `${key}, `
+            const insertItemKey = (item:any) => {
+                for (let key in item) {
+                    SQL += `${key}, `
+                }
+                if (SQL[SQL.length-1] === ' ') SQL = SQL.substr(0, SQL.length-2)
+                else throw utils.unifyErrMesg(`Invalid insert command for empty object`, 'postgres', 'sql statement')
             }
-
-            if (SQL[SQL.length-1] === ' ') SQL = SQL.substr(0, SQL.length-2)
-            else throw utils.unifyErrMesg(`Invalid insert command for empty object`, 'postgres', 'sql statement')
-
+            if (Array.isArray(obj) && obj.length > 0) {
+                insertItemKey(obj[0])
+            } else if (!Array.isArray(obj)) {
+                insertItemKey(obj)
+            } else {
+                throw utils.unifyErrMesg(`Invalid insert command for empty object`, 'postgres', 'sql statement')
+            }
+            
             SQL += ') VALUES ('
-            for(let key in obj) {
-                const value = this.parseValueForSQLStatement(table, key, obj[key])
-                console.log(`${table}.${key}: ${value}`)
-                SQL += `${value}, `
+            const insertItemValue = (item:any) => {
+                for(let key in item) {
+                    const value = this.parseValueForSQLStatement(table, key, item[key])
+                    SQL += `${value}, `
+                }
+                if (SQL[SQL.length-1] === ' ') SQL = SQL.substr(0, SQL.length-2)
             }
-            if (SQL[SQL.length-1] === ' ') SQL = SQL.substr(0, SQL.length-2)
+            if (Array.isArray(obj) && obj.length > 0) {
+                SQL = SQL.substr(0, SQL.length -1)
+                for (let item of obj) {
+                    SQL += '('
+                    insertItemValue(item)
+                    SQL += '), '
+                }
+                if (SQL[SQL.length-1] === ' ') SQL = SQL.substr(0, SQL.length-3)
+            } else if (!Array.isArray(obj)) {
+                insertItemValue(obj)
+            } else {
+                throw utils.unifyErrMesg(`Invalid insert command for empty object`, 'postgres', 'sql statement')
+            }
+            
             SQL += ');'
         } else if (identities && obj) {
             // Update commmand
