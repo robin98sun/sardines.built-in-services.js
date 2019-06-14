@@ -386,7 +386,7 @@ export class Database extends StorageBase {
                 throw utils.unifyErrMesg(`Invalid insert command for empty object`, 'postgres', 'sql statement')
             }
             
-            SQL += ');'
+            SQL += ') RETURNING id;'
         } else if (identities && obj) {
             // Update commmand
             SQL = `UPDATE ${fullTableName} SET `
@@ -402,6 +402,16 @@ export class Database extends StorageBase {
             SQL = `DELETE from ${fullTableName} ${this.parseIdentities(table, identities)};`
         }
         const res = await this.query(SQL)
+        if (Array.isArray(res.rows) && res.rows.length > 0) {
+            if (Array.isArray(obj) && obj.length === res.rows.length) {
+                const arr = obj.map((item,i) => Object.assign({}, item, res.rows[i]))
+                return arr
+            } else if (!Array.isArray(obj) && res.rows.length === 1) {
+                return Object.assign({}, obj, res.rows[0])
+            } else {
+                throw utils.unifyErrMesg(`Unmatched inserted number of objects, number of source data items: ${Array.isArray(obj)?obj.length:1}, number of inserted objects: ${res.rows.length}`, 'postgres', 'sql execution')
+            }
+        }
         return res
     }
 }
