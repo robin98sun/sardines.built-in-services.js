@@ -1,4 +1,3 @@
-import * as StoragePackage from './storage'
 export {
     PostgresSQL,
     PostgresServerSettings,
@@ -6,7 +5,6 @@ export {
     PostgresTableStructure,
     StorageType,
     StorageSettings,
-    StorageBaseClass
+    Storage,
+    setup as setupStorage
 } from './storage'
-
-export const storage = StoragePackage

@@ -36,6 +36,13 @@ const builtInFunctions = {
     'CURRENT_TIMESTAMP': true
 }
 
+export const getPgTimeSting = (t: Date): string => {
+    let str = `${t.getFullYear()}-${t.getMonth()<9?'0':''}${t.getMonth()+1}-${t.getDate()<10?'0':''}${t.getDate()}`
+    str += ` ${t.getHours()<10?'0':''}${t.getHours()}:${t.getMinutes()<10?'0':''}${t.getMinutes()}:${t.getSeconds()<10?'0':''}${t.getSeconds()}`
+    str += ` ${t.getTimezoneOffset()>=0?'-':'+'}${t.getTimezoneOffset()/60<10?'0':''}${Math.abs(Math.round(t.getTimezoneOffset()/60))}:${t.getTimezoneOffset()<10?'0':''}${t.getTimezoneOffset()%60}`
+    return str
+}
+
 export class Database extends StorageBase {
     private pool: any
     private settings: ServerSettings
@@ -229,10 +236,11 @@ export class Database extends StorageBase {
 
     private composeValueForSQLStatement = (colType: any, value: any, tableName: string, colName: string): string => {
         let result = ''
+        if (typeof value === 'undefined') return result
         if (typeof colType === 'string') {
             if (colType.indexOf('[]') < 0) {
                 switch (typeof value) {
-                    case 'object':
+                case 'object':
                     if (colType === 'JSONB' || colType === 'JSON') {
                         result = `'${JSON.stringify(value)}'`
                         result += `::${colType}`
@@ -241,12 +249,19 @@ export class Database extends StorageBase {
                     }
                     break
             
-                    case 'string':
-                    if (value in builtInFunctions) result = value
-                    else result = `'${value}'`
+                case 'string': case 'number':
+                    if (typeof value === 'string' && value in builtInFunctions) result = value
+                    else if (colType.toLowerCase().indexOf('timestamp') === 0) {
+                        let v = (typeof value === 'number') ? value.toString() : value
+                        if (v.match(/^\d+$/)) {
+                            if (['timestamp', 'timestamptz'].indexOf(colType.toLowerCase()) >=0) {
+                                result = `'${getPgTimeSting(new Date(Number(v)))}'`
+                            } else result = `to_timestamp(${Number(v)/1000})`
+                        } else result = `'${v}'::${colType}`
+                    } else result = `'${value}'`
                     break
-            
-                    default:
+                
+                default:
                     result = `${value}`
                     break
                 }
@@ -385,8 +400,11 @@ export class Database extends StorageBase {
             } else {
                 throw utils.unifyErrMesg(`Invalid insert command for empty object`, 'postgres', 'sql statement')
             }
-            
-            SQL += ') RETURNING id;'
+            if (tableStruct['id'] || tableStruct['ID'] || tableStruct['Id']) {
+                SQL += ') RETURNING id;'
+            } else {
+                SQL += ');'
+            }
         } else if (identities && obj) {
             // Update commmand
             SQL = `UPDATE ${fullTableName} SET `
