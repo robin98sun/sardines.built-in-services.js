@@ -244,6 +244,8 @@ export class Database extends StorageBase {
                     if (colType === 'JSONB' || colType === 'JSON') {
                         result = `'${JSON.stringify(value)}'`
                         result += `::${colType}`
+                    } else if (value instanceof Date) {
+                        return this.composeValueForSQLStatement(colType, value.getTime(), tableName, colName)
                     } else if (colType === 'POINT') {
                         // TODO
                     }
