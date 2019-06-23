@@ -234,9 +234,9 @@ export class Database extends StorageBase {
         else return colType
     }
 
-    private composeValueForSQLStatement = (colType: any, value: any, tableName: string, colName: string): string => {
+    private composeValueForSQLStatement = (colType: any, value: any, tableName: string, colName: string): string|undefined|null => {
         let result = ''
-        if (typeof value === 'undefined') return result
+        if (typeof value === 'undefined' || value === null) return value
         if (typeof colType === 'string') {
             if (colType.indexOf('[]') < 0) {
                 switch (typeof value) {
@@ -304,7 +304,7 @@ export class Database extends StorageBase {
         return result
     }
     
-    private parseValueForSQLStatement = (table: string, colName: string, value: any): string => {
+    private parseValueForSQLStatement = (table: string, colName: string, value: any): string|undefined|null => {
         const colType = this.getColumnType(table, colName)
         return this.composeValueForSQLStatement(colType, value, table, colName)
     }
@@ -315,6 +315,7 @@ export class Database extends StorageBase {
             let cnt = 0
             for (let key in identities) {
                 const value = this.parseValueForSQLStatement(table, key, identities[key])
+                if (typeof value === 'undefined' || value === null) continue
                 if (cnt === 0) SQL += ' WHERE '
                 else SQL += ' AND '
                 SQL += `${key} = ${value}`
