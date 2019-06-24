@@ -58,6 +58,32 @@ export class Database extends StorageBase {
         this.structure = dbStruct
     }
 
+    public static mergeDbStructs(baseStruct:DatabaseStructure, extraStruct:DatabaseStructure) {
+        let struct: DatabaseStructure = {}
+        // Get all tables first
+        for (let t in baseStruct) {
+            if (!extraStruct[t]) struct[t] = baseStruct[t]
+            else struct[t] = {}
+        }
+        for (let t in extraStruct) {
+            if (!baseStruct[t]) struct[t] = extraStruct[t]
+        }
+        // Merge tables
+        for (let t in struct) {
+            let baseTable = baseStruct[t]
+            let extraTable = extraStruct[t]
+            if (baseTable && extraTable) {
+                for (let col in baseTable) {
+                    if (!extraTable[col]) struct[t][col] = baseTable[col]
+                }
+                for (let col in extraTable) {
+                    struct[t][col] = extraTable[col]
+                }
+            }
+        }
+        return struct
+    }
+
     // SQL Engine
     public query(sql:string): Promise<any> {
         return new Promise((resolve, reject) => {
@@ -217,7 +243,7 @@ export class Database extends StorageBase {
     }
 
     // DML 
-    private getColumnType(table: string, colName: string): any {
+    public getColumnType(table: string, colName: string): any {
         const tableStruct = this.structure[table]
         if (!tableStruct) {
             throw utils.unifyErrMesg(`Do not have table structure for table [${table}]`, 'postgres', 'database structure')
@@ -327,12 +353,23 @@ export class Database extends StorageBase {
         return SQL
     }
 
+    private parseOrderby (table: string, orderby: any):string {
+        let SQL = ''
+        if (!orderby) return SQL
+        for (let key in orderby) {
+            const colType = this.getColumnType(table, key)
+            if (!colType) continue
+            SQL += `${SQL===''?' ORDER BY':','} ${key} ${orderby[key] > 0 ? 'ASC' : 'DESC'}`
+        }
+        return SQL
+    }
+
     private getFullTableName(table:string) {
         return (this.settings.schema) ? `${this.settings.schema}.${table}` : table
     }
 
     // Public interfaces
-    async get(table: string, identities?: any): Promise<any> {
+    async get(table: string, identities?: any, orderby: any = null, limit: number = 1, offset: number = 0): Promise<any> {
         const exists = await this.tableExists(table)
         if (!exists) return null
 
@@ -341,7 +378,11 @@ export class Database extends StorageBase {
 
         if (identities) SQL += this.parseIdentities(table, identities)
         
-        SQL += ';'
+        if (orderby && typeof orderby === 'object') {
+            SQL += this.parseOrderby(table, orderby)
+        }
+
+        SQL += ` LIMIT ${limit <=0 ? 'ALL' : limit} OFFSET ${offset};`
 
         const res = await this.query(SQL)
         if (res && res.rows) {

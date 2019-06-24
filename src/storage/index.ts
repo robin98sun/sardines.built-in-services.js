@@ -45,3 +45,9 @@ export const setup = (storageSettings: StorageSettings, databaseStructure?: any)
     }
     return storageInstance
 }
+
+export {
+    Templete as PostgresTemplete,
+    Account,
+    Token
+} from './postgresql_templete'
