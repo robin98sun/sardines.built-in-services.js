@@ -1,7 +1,7 @@
 export {
     Account,
     Token,
-    PostgresTemplete,
+    PostgresTempleteAccount,
     PostgresSQL,
     PostgresServerSettings,
     PostgresDatabaseStructure,

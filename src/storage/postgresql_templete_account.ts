@@ -67,9 +67,9 @@ export const basePostgresDBStruct: DatabaseStructure = {
 
 export interface Account {
     id?: string
-    name?: string
-    email?: string
-    mobile?: string
+    name?: any
+    email?: any 
+    mobile?: any
     can_login?: boolean
     can_manage_accounts?: boolean
     password?: string
@@ -81,7 +81,7 @@ export interface Token {
     expire_on?: number
 }
 
-export class Templete {
+export class TempleteAccount {
     protected db: Database|null = null
     protected isInited: boolean = false
     protected tokenCache: Map<string, Token>
@@ -91,7 +91,7 @@ export class Templete {
         this.tokenCache = new Map()
     }
 
-    public async setupDB(serverSettings: ServerSettings, dbStruct?: DatabaseStructure) {
+    protected async setupDB(serverSettings: ServerSettings, dbStruct?: DatabaseStructure) {
         if (dbStruct) {
             this.dbStruct = Database.mergeDbStructs(basePostgresDBStruct, dbStruct)
         }
@@ -131,7 +131,8 @@ export class Templete {
     }
 
     protected async createOrUpdateAccount(account: Account) {
-        if (account.password) account.password = await cryptPassword(account.password) 
+        if (account.password) account.password = await cryptPassword(account.password)
+        else if (!account.id) throw 'password is required to create account'
         if (!account.id) return await this.db!.set('account', account)
         else return this.db!.set('account', account, {id: account.id})
     }
@@ -152,12 +153,14 @@ export class Templete {
 
         // Check whether account exists
         let accountInst = await this.queryAccount(account)
-        if (account) {
+        if (accountInst) {
             throw 'Account already exists'
         } else {
-            accountInst = account
-            accountInst = await this.createOrUpdateAccount(accountInst)
-            return accountInst
+            let accountObj = Object.assign({}, account)
+            accountObj.password = password
+            accountInst = await this.createOrUpdateAccount(accountObj)
+            const tokenObj = await this.createToken(accountInst.id)
+            return tokenObj.token
         }
     }
 
