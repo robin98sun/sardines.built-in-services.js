@@ -196,7 +196,7 @@ export class TempleteAccount {
         } else {
             if (update) {
                 tokenObj.expire_on = Date.now() + 1800000
-                await this.db!.set('token', tokenObj)
+                await this.db!.set('token', tokenObj, {account_id: tokenObj.account_id, token: tokenObj.token})
                 this.tokenCache.set(token, tokenObj)
             }
             return tokenObj
