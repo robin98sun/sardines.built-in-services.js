@@ -294,27 +294,35 @@ export class Database extends StorageBase {
                     break
                 }
             } else if (Array.isArray(value)) {
-                result = 'ARRAY['
-                const subColType = colType.substr(0, colType.indexOf('[]'))
+                if (value.length > 0) {
+                    result = 'ARRAY['
+                    const subColType = colType.substr(0, colType.indexOf('[]'))
 
-                for(let i = 0; i<value.length ; i++) {
-                    const item = value[i]
-                    result += this.composeValueForSQLStatement(subColType, item, tableName, colName)
-                    if (i < value.length - 1) result += ', '
+                    for(let i = 0; i<value.length ; i++) {
+                        const item = value[i]
+                        result += this.composeValueForSQLStatement(subColType, item, tableName, colName)
+                        if (i < value.length - 1) result += ', '
+                    }
+                    result += ']'
+                } else {
+                    result = 'NULL'
                 }
-                result += ']'
             }
         } else if (typeof colType === 'object') {
             // Composite Type
             if (Array.isArray(colType) && colType.length === 1 && Array.isArray(value)) {
-                result = 'ARRAY['
-                const compositeType = colType[0]
-                for(let i = 0; i<value.length ; i++) {
-                    const item = value[i]
-                    result += this.composeValueForSQLStatement(compositeType, item, tableName, colName)
-                    if (i < value.length - 1) result += ', '
+                if (value.length > 0) {
+                    result = 'ARRAY['
+                    const compositeType = colType[0]
+                    for(let i = 0; i<value.length ; i++) {
+                        const item = value[i]
+                        result += this.composeValueForSQLStatement(compositeType, item, tableName, colName)
+                        if (i < value.length - 1) result += ', '
+                    }
+                    result += ']' 
+                } else {
+                    result = 'NULL'
                 }
-                result += ']' 
             } else if (!Array.isArray(colType) && !Array.isArray(value) && typeof value === 'object') {
                 result = 'ROW('
                 for (let key in colType) {
