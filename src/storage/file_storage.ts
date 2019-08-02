@@ -1,4 +1,4 @@
-import * as utils from 'sardines-utils'
+import { utils } from 'sardines-core'
 import { StorageBase } from './base'
 import * as fs from 'fs'
 import * as path from 'path'

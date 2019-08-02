@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import * as utils from 'sardines-utils'
+import { utils } from 'sardines-core'
 import { StorageBase } from './base'
 
 export interface TableStructure {
