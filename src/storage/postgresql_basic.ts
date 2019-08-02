@@ -128,9 +128,10 @@ export class Database extends StorageBase {
 
     private async createCompositeType(typeName: string, definition: TableStructure): Promise<any> {
         let SQL = null
+        const typeFullName = `${this.settings.schema?this.settings.schema+'.':''}${typeName}`
         for (let col in definition) {
             if (DDLKeywords[col.toUpperCase()]) continue
-            if (!SQL) SQL = `CREATE TYPE ${this.settings.schema?this.settings.schema+'.':''}${typeName} AS (`
+            if (!SQL) SQL = `CREATE TYPE ${typeFullName} AS (`
             const type = definition[col]
             if (typeof type === 'string') {
                 SQL += ` ${col} ${type}, `
@@ -156,6 +157,8 @@ export class Database extends StorageBase {
         if (SQL) {
             SQL = SQL.substr(0, SQL.length-2)
             SQL += ');'
+            
+            await this.query(`DROP TYPE IF EXISTS ${typeFullName};`)
             return await this.query(SQL)
         } else {
             throw utils.unifyErrMesg(
