@@ -10,9 +10,9 @@
         "@types/bcrypt": "^3.0.0",
         "@types/pg": "^7.4.14",
         "bcrypt": "^3.0.6",
-        "pg": "^7.11.0",
+        "pg": "^7.12.0",
         "sardines-core": "*",
-        "typescript": "^3.4.5"
+        "typescript": "^3.5.3"
     },
     "description": "A built-in service provider for sardines.js",
     "devDependencies": {},
@@ -25,7 +25,6 @@
     ],
     "license": "ISC",
     "main": "lib/index.js",
-    "type": "lib/index.d.ts",
     "name": "sardines-built-in-services",
     "repository": {
         "type": "git",
@@ -33,8 +32,9 @@
     },
     "scripts": {
         "build": "npm run clear && tsc --build conf/tsconfig.json",
-        "prepublish": "npm run build",
-        "clear": "rm -rf lib/*"
+        "clear": "rm -rf lib/*",
+        "prepublish": "npm run build"
     },
-    "version": "0.0.1"
+    "type": "lib/index.d.ts",
+    "version": "0.1.1"
 }
