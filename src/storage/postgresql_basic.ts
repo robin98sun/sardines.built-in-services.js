@@ -328,16 +328,23 @@ export class Database extends StorageBase {
                 }
             } else if (!Array.isArray(colType) && !Array.isArray(value) && typeof value === 'object') {
                 result = 'ROW('
+                let validKeyCnt = 0
                 for (let key in colType) {
                     const subType = colType[key]
                     if (key in value) {
+                        if (typeof value[key] === 'undefined') continue
+                        validKeyCnt++
                         const subValue = this.composeValueForSQLStatement(subType, value[key], tableName, `${colName}_${key}`)
                         result += subValue
                     }
                     result += ', '
                 }
-                if (result.substr(-2) === ', ') result = result.substr(0, result.length - 2)
-                result += `)::${this.settings.schema?this.settings.schema+'.':''}${tableName}_${colName}`
+                if (!validKeyCnt) result = 'NULL'
+                else {
+                    if (result.substr(-2) === ', ') result = result.substr(0, result.length - 2)
+                    result += `)::${this.settings.schema?this.settings.schema+'.':''}${tableName}_${colName}`
+                }
+
             }
         }
         return result
@@ -353,11 +360,24 @@ export class Database extends StorageBase {
         if (identities) {
             let cnt = 0
             for (let key in identities) {
-                const value = this.parseValueForSQLStatement(table, key, identities[key])
+                let value = identities[key]
+                let op = null
+                // parse the comparison operator
+                if (typeof value === 'string' && value.length > 3 && value[2] === ':') {
+                    op = value.substr(0,2).toLowerCase()
+                    value = value.substr(3)
+                }
+                value = this.parseValueForSQLStatement(table, key, value)
                 if (typeof value === 'undefined' || value === null) continue
                 if (cnt === 0) SQL += ' WHERE '
                 else SQL += ' AND '
-                SQL += `${key} = ${value}`
+                if (!op) SQL += `${key} = ${value}`
+                else if (op === 'ne') SQL += `${key} != ${value}`
+                else if (op === 'ge') SQL += `${key} >= ${value}`
+                else if (op === 'le') SQL += `${key} <= ${value}`
+                else if (op === 'gt') SQL += `${key} > ${value}`
+                else if (op === 'lt') SQL += `${key} < ${value}`
+                else SQL += `${key} = ${value}`
                 cnt++
             }
         }
@@ -411,6 +431,7 @@ export class Database extends StorageBase {
         }
         let SQL = ''
         const tableExists = await this.tableExists(table)
+        if (!tableExists && !obj) return null
         const fullTableName = this.getFullTableName(table)
         
         if (!identities && obj) {
