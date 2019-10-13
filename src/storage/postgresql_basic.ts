@@ -400,12 +400,19 @@ export class Database extends StorageBase {
     }
 
     // Public interfaces
-    async get(table: string, identities?: any, orderby: any = null, limit: number = 1, offset: number = 0): Promise<any> {
+    async get(table: string, identities?: any, orderby: any = null, limitLines: number = 1, offset: number = 0, distinct: string[] = []): Promise<any> {
+        let limit = limitLines
         const exists = await this.tableExists(table)
         if (!exists) return null
 
         const fullTableName = this.getFullTableName(table)
-        let SQL = `SELECT * FROM ${fullTableName}`
+        let SQL = ''
+        if (distinct.length === 0) {
+            SQL = `SELECT * FROM ${fullTableName}`
+        } else {
+            limit = 0
+            SQL = `SELECT DISTINCT ${distinct.join(', ')} FROM ${fullTableName}`
+        }
 
         if (identities) SQL += this.parseIdentities(table, identities)
         
