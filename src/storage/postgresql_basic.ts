@@ -451,7 +451,7 @@ export class Database extends StorageBase {
         }
         let SQL = ''
         const tableExists = await this.tableExists(table)
-        if (!tableExists && !obj) return null
+        if (!tableExists && identities) return null
         const fullTableName = this.getFullTableName(table)
         
         if (!identities && obj) {
