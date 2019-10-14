@@ -366,9 +366,21 @@ export class Database extends StorageBase {
                 if (typeof value === 'string' && value.length > 3 && value[2] === ':') {
                     op = value.substr(0,2).toLowerCase()
                     value = value.substr(3)
+                } else if (value && Array.isArray(value) && value.length) {
+                    op = 'IN'
+                    let valueStr = ''
+                    for (let v of value) {
+                        const s = this.parseValueForSQLStatement(table, key, v)
+                        if (!s) continue
+                        if (valueStr === '') valueStr = s
+                        else valueStr += `, ${s}`
+                    }
+                    value = valueStr
                 }
-                value = this.parseValueForSQLStatement(table, key, value)
-                if (typeof value === 'undefined' || value === null) continue
+                if (op !== 'IN') {
+                    value = this.parseValueForSQLStatement(table, key, value)
+                }
+                if (typeof value === 'undefined' || value === null || value === '') continue
                 if (cnt === 0) SQL += ' WHERE '
                 else SQL += ' AND '
                 if (!op) SQL += `${key} = ${value}`
@@ -377,6 +389,7 @@ export class Database extends StorageBase {
                 else if (op === 'le') SQL += `${key} <= ${value}`
                 else if (op === 'gt') SQL += `${key} > ${value}`
                 else if (op === 'lt') SQL += `${key} < ${value}`
+                else if (op === 'IN') SQL += `${key} IN (${value})`
                 else SQL += `${key} = ${value}`
                 cnt++
             }
