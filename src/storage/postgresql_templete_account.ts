@@ -86,6 +86,7 @@ export class TempleteAccount {
     protected isInited: boolean = false
     protected tokenCache: Map<string, Token>
     protected dbStruct: DatabaseStructure = basePostgresDBStruct
+    protected tokenExpireInSeconds: number = 1800
 
     constructor() {
         this.tokenCache = new Map()
@@ -164,7 +165,7 @@ export class TempleteAccount {
         }
     }
 
-    protected async createToken(accountId: string): Promise<Token> {
+    protected async createToken(accountId: string, expireInSeconds: number = this.tokenExpireInSeconds): Promise<Token> {
         let tokenQuery = {
             account_id: accountId,
             token: genToken(30)
@@ -175,7 +176,11 @@ export class TempleteAccount {
             tokenInDb = await this.db!.get('token', tokenQuery)
         }
         let tokenObj: Token = tokenQuery
-        tokenObj.expire_on = Date.now() + 1800000
+        if (expireInSeconds > 0) {
+            tokenObj.expire_on = Date.now() + 1000 * expireInSeconds
+        } else {
+            tokenObj.expire_on = Number.MAX_SAFE_INTEGER
+        }
         await this.db!.set('token', tokenObj)
         this.tokenCache.set(tokenObj.token, tokenObj)
         return tokenObj
@@ -195,7 +200,7 @@ export class TempleteAccount {
             throw 'token expired'
         } else {
             if (update) {
-                tokenObj.expire_on = Date.now() + 1800000
+                tokenObj.expire_on = Date.now() + 1000 * this.tokenExpireInSeconds
                 await this.db!.set('token', tokenObj, {account_id: tokenObj.account_id, token: tokenObj.token})
                 this.tokenCache.set(token, tokenObj)
             }
