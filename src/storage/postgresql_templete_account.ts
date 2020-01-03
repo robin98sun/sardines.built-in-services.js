@@ -97,6 +97,7 @@ export class TempleteAccount {
             this.dbStruct = Database.mergeDbStructs(basePostgresDBStruct, dbStruct)
         }
         this.db = new Database(serverSettings, this.dbStruct)
+        return this.db
     }
 
     protected async touch(tableName: string, obj: any) {
