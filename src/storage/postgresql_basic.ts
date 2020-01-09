@@ -265,7 +265,7 @@ export class Database extends StorageBase {
 
     private composeValueForSQLStatement = (colType: any, value: any, tableName: string, colName: string): string|undefined|null => {
         let result = ''
-        if (typeof value === 'undefined' || value === null) return value
+        if (typeof value === 'undefined' || value === null) return 'NULL'
         if (typeof colType === 'string') {
             if (colType.indexOf('[]') < 0) {
                 switch (typeof value) {
