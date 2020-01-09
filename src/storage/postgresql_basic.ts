@@ -331,13 +331,13 @@ export class Database extends StorageBase {
                 let validKeyCnt = 0
                 for (let key in colType) {
                     const subType = colType[key]
+                    let subValue:string | null | undefined = 'NULL'
                     if (key in value) {
                         if (typeof value[key] === 'undefined') continue
                         validKeyCnt++
-                        const subValue = this.composeValueForSQLStatement(subType, value[key], tableName, `${colName}_${key}`)
-                        result += subValue
+                        subValue = this.composeValueForSQLStatement(subType, value[key], tableName, `${colName}_${key}`)
                     }
-                    result += ', '
+                    result += subValue + ', '
                 }
                 if (!validKeyCnt) result = 'NULL'
                 else {
