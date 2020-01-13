@@ -336,6 +336,7 @@ export class Database extends StorageBase {
                         if (typeof value[key] === 'undefined') continue
                         validKeyCnt++
                         subValue = this.composeValueForSQLStatement(subType, value[key], tableName, `${colName}_${key}`)
+                        if (!subValue) subValue = 'NULL'
                     }
                     result += subValue + ', '
                 }
