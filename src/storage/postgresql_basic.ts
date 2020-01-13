@@ -281,7 +281,8 @@ export class Database extends StorageBase {
                     break
             
                 case 'string': case 'number':
-                    if (typeof value === 'string' && value in builtInFunctions) result = value
+                    if (typeof value === 'string' && !value) result = 'NULL'
+                    else if (typeof value === 'string' && value in builtInFunctions) result = value
                     else if (colType.toLowerCase().indexOf('timestamp') === 0) {
                         let v = (typeof value === 'number') ? value.toString() : value
                         if (v.match(/^\d+$/)) {
@@ -336,7 +337,6 @@ export class Database extends StorageBase {
                         if (typeof value[key] === 'undefined') continue
                         validKeyCnt++
                         subValue = this.composeValueForSQLStatement(subType, value[key], tableName, `${colName}_${key}`)
-                        if (!subValue) subValue = 'NULL'
                     }
                     result += subValue + ', '
                 }
