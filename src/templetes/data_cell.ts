@@ -19,19 +19,25 @@ export interface DataCellSettings {
 
 export class DataCell {
 
-  protected db: PostgreSQL
-  protected cache: RedisCache
+  public db: PostgreSQL
+  public cache: RedisCache
 
   constructor(settings: DataCellSettings) {
-    this.setupInstances(settings)
+    this.createInstances(settings)
   }
 
-  private setupInstances(settings: DataCellSettings) {
+  private createInstances(settings: DataCellSettings) {
     if (settings && settings.database && settings.tableStructure) {
       this.db = new PostgreSQL(settings.database, settings.tableStructure)
     }
     if (settings && settings.cache) {
       this.cache = new RedisCache(settings.cache)
+    }
+  }
+
+  public async setup() {
+    if (this.cache) {
+      await this.cache.connect()
     }
   }
 
