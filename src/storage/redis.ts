@@ -84,7 +84,13 @@ export class RedisCache extends StorageBase{
     this.serverSettings = mergeDefaultServerSettings(serverSettings)
   }
 
+  get connected() {
+    return this.client && this.client.connected
+  }
+
   async connect(serverSettings: RedisServerSettings = null): Promise<any> {
+    if (this.connected) return
+
     if (serverSettings) {
       this.serverSettings = mergeDefaultServerSettings(serverSettings)
     }
@@ -209,7 +215,6 @@ export class RedisCache extends StorageBase{
         if (err) reject(err)
         resolve(res)
       })
-
       handler.apply(this.client, args)
     })
     

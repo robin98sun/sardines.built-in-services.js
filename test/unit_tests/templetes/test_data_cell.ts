@@ -18,10 +18,26 @@ describe('[data cell] connections', () => {
   it('should operate cache', async() => {
     const key = 'theKey'
     const value = 'theValue'
-    const res = dc.cache.set(key, value)
+    let res = await dc.cache.set(key, value)
     expect(res).to.equal('OK')
-    const valueInRedis = dc.cache.get(key)
+    let valueInRedis = await dc.cache.get(key)
     expect(valueInRedis).to.equal(value)
+    res = await dc.cache.del(key)
+    expect(res).to.equal(1)
+    valueInRedis = await dc.cache.get(key)
+    expect(valueInRedis).to.be.null
+  })
+
+  it('should operate database', async() => {
+    expect(await dc.db.tableExists('account_test')).to.be.false
+    const account = {name: 'Robin', password: 'this is a password'}
+    let res = await dc.db.set('account_test', account)
+    expect(res).has.property('id')
+    expect(res).has.property('name', account.name)
+    expect(res).has.property('password', account.password)
+    expect(await dc.db.tableExists('account_test')).to.be.true
+    res = await dc.db.query('DROP TABLE account_test')
+    expect(res).not.to.be.null
   })
 
 })
