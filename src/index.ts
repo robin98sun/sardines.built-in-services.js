@@ -1,7 +1,4 @@
 export {
-    Account,
-    Token,
-    PostgresTempleteAccount,
     PostgresSQL,
     PostgresServerSettings,
     PostgresDatabaseStructure,
@@ -9,5 +6,15 @@ export {
     StorageType,
     StorageSettings,
     Storage,
-    setup as setupStorage
-} from './storage'
+    setup as setupStorage,
+    RedisCache, 
+    RedisServerSettings,
+    RedisDataType,
+    RedisOperationOptions
+} from './storage/index'
+
+export {
+    TempleteAccount as PostgresTempleteAccount,
+    Account,
+    Token
+} from './templetes/postgresql_templete_account'

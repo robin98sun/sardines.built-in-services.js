@@ -58,6 +58,10 @@ export class Database extends StorageBase {
         this.structure = dbStruct
     }
 
+    public async close() {
+        await this.pool.end()
+    }
+
     public static mergeDbStructs(baseStruct:DatabaseStructure, extraStruct:DatabaseStructure) {
         let struct: DatabaseStructure = {}
         // Get all tables first
@@ -104,7 +108,7 @@ export class Database extends StorageBase {
     }
 
     // DDL
-    private async tableExists(table: string): Promise<any> {
+    public async tableExists(table: string): Promise<any> {
         let exists = false
         if (typeof this.existingTables[table] === 'undefined') {
             let SQL = `SELECT EXISTS (

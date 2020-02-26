@@ -11,7 +11,7 @@ import {
     DatabaseStructure,
     ServerSettings,
     Database
-} from './postgresql_basic'
+} from '../storage/postgresql'
 
 const cryptPassword = async (password: string): Promise<string> => {
     return new Promise((resolve, reject) => {
