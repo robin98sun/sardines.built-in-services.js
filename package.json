@@ -42,7 +42,7 @@
         "test": "mocha -r ts-node/register --exit test/unit_tests/**/*.ts",
         "build": "npm run clear && tsc --build conf/tsconfig.json",
         "clear": "rm -rf lib/*",
-        "prepublish": "npm run build"
+        "prepublish": "npm run build && npm run test"
     },
     "type": "lib/index.d.ts",
     "version": "1.0.11"
