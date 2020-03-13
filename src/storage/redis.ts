@@ -4,8 +4,8 @@
  */
 
 import * as redis from 'redis'
-import { ReplyError } from 'redis'
-import { promisify } from 'util'
+// import { ReplyError } from 'redis'
+// import { promisify } from 'util'
 import { StorageBase } from './base'
 
 // Server settings
@@ -24,6 +24,7 @@ export interface RedisServerSettings {
   disable_resubscribing?: boolean
   retry_strategy?: any
   db?: number
+  [key:string]: any
 }
 
 const defaultServerSettings:RedisServerSettings = {
@@ -65,7 +66,7 @@ export const defaultRedisOperationOptions = {
   expire: -1
 }
 
-const mergeDefaultRedisOperationOptions = (options: RedisOperationOptions): RedisOperationOptions => {
+const mergeDefaultRedisOperationOptions = (options?: RedisOperationOptions): RedisOperationOptions => {
   const newOptions = Object.assign({}, defaultRedisOperationOptions, options)
   return newOptions
 }
@@ -88,7 +89,7 @@ export class RedisCache extends StorageBase{
     return this.client && this.client.connected
   }
 
-  async connect(serverSettings: RedisServerSettings = null): Promise<any> {
+  async connect(serverSettings: RedisServerSettings|null = null): Promise<any> {
     if (this.connected) return
 
     if (serverSettings) {
@@ -98,7 +99,7 @@ export class RedisCache extends StorageBase{
     // Set default retry_strategy
     if (!this.serverSettings.retry_strategy && this.serverSettings.retry_strategy !== false) {
       const that = this
-      this.serverSettings.retry_strategy = function(options) {
+      this.serverSettings.retry_strategy = function(options:any) {
         if (options.error && options.error.code === "ECONNREFUSED") {
           // End reconnecting on a specific error and flush all commands with
           // a individual error
@@ -144,7 +145,7 @@ export class RedisCache extends StorageBase{
         }
       }
 
-      this.client.on('error', (err) => {
+      this.client.on('error', (err:any) => {
         console.error('redis connection error:', err)
         reject(err)
       })
@@ -162,7 +163,7 @@ export class RedisCache extends StorageBase{
       if (theOptions.dataType === RedisDataType.object) {
         handler = this.client.hgetall
       }
-      const args = [key, (err, res) => {
+      const args = [key, (err:any, res:any) => {
         if (err) reject(err)
         switch(theOptions.dataType) {
         case RedisDataType.number:
@@ -182,7 +183,7 @@ export class RedisCache extends StorageBase{
 
   async del(key: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.client.del(key, (err, res) => {
+      this.client.del(key, (err:any, res:any) => {
         if (err) reject(err)
         resolve(res)
       })
@@ -206,12 +207,12 @@ export class RedisCache extends StorageBase{
         args.push(obj)
       }
 
-      if (theOptions.expire > 0) {
+      if (typeof theOptions.expire !== 'undefined' && theOptions.expire > 0) {
         args.push('EX')
         args.push(theOptions.expire)
       }
       
-      args.push((err, res) => {
+      args.push((err: any, res: any) => {
         if (err) reject(err)
         resolve(res)
       })

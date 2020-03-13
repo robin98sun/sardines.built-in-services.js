@@ -1,8 +1,8 @@
 import { 
   RedisCache, 
   RedisServerSettings,
-  RedisDataType,
-  RedisOperationOptions
+  // RedisDataType,
+  // RedisOperationOptions
 } from '../storage/redis'
 
 import { 
@@ -19,8 +19,8 @@ export interface DataCellSettings {
 
 export class DataCell {
 
-  public db: PostgreSQL
-  public cache: RedisCache
+  public db: PostgreSQL|null = null
+  public cache: RedisCache|null = null
 
   constructor(settings: DataCellSettings) {
     this.createInstances(settings)

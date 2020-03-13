@@ -1,5 +1,5 @@
 export {
-    PostgresSQL,
+    PostgreSQL,
     PostgresServerSettings,
     PostgresDatabaseStructure,
     PostgresTableStructure,
