@@ -6,7 +6,7 @@ import {
 
 // Postgres settings
 export const testDbSettings: PostgresServerSettings = {
-  host: "nw-test02",
+  host: "nw-test",
   port: 5432,
   database: "rd_test",
   schema: "rd",
@@ -38,7 +38,7 @@ export const testTableStruct: PostgresDatabaseStructure = {
 
 // Redis Settings
 export const testRedisServerSettings: RedisServerSettings = {
-  host: 'nw-test02',
+  host: 'nw-test',
   password: 'Startup@2020',
   db: 3
 }
