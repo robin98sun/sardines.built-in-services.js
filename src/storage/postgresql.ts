@@ -427,8 +427,15 @@ export class Database extends StorageBase {
     }
 
     // Public interfaces
-    async get(table: string, identities?: any, orderby: any = null, limitLines: number = 1, offset: number = 0, distinct: string[] = []): Promise<any> {
+    async get(table: string, identities?: any, orderby: any = null, limitLines: number = -1998, offset: number = 0, distinct: string[] = []): Promise<any> {
         let limit = limitLines
+        // Default LIMIT
+        if (limit === -1998 && distinct.length === 0) {
+            limit = 1
+        } else if (limit === -1998) {
+            limit = 0
+        }
+
         const exists = await this.tableExists(table)
         if (!exists) return null
 
