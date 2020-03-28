@@ -444,7 +444,6 @@ export class Database extends StorageBase {
         if (distinct.length === 0) {
             SQL = `SELECT * FROM ${fullTableName}`
         } else {
-            limit = 0
             SQL = `SELECT DISTINCT ${distinct.join(', ')} FROM ${fullTableName}`
         }
 
