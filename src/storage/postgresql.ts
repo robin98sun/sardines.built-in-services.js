@@ -368,45 +368,68 @@ export class Database extends StorageBase {
             let value = identities[key]
             let op = null
             const colType = this.getColumnType(table, key)
-            // parse the comparison operator
-            if (typeof value === 'string' && value.length > 3 && value[2] === ':') {
-                op = value.substr(0,2).toLowerCase()
-                value = value.substr(3)
-            } else if (value && Array.isArray(value) && value.length) {
-                op = 'IN'
-                let valueStr = ''
-                for (let v of value) {
-                    const s = this.parseValueForSQLStatement(table, key, v)
-                    if (!s) continue
-                    if (valueStr === '') valueStr = s
-                    else valueStr += `, ${s}`
-                }
-                value = valueStr
-            } else if (colType === 'JSONB') {
-                op = '@>'
-                if (value && typeof value === 'object') {
-                    value = JSON.stringify(value)
-                } 
-            }
-            if (op !== 'IN') {
-                value = this.parseValueForSQLStatement(table, key, value)
-            }
-            if (typeof value === 'undefined' || value === null || value === '') {
-                op = 'IS'
-                value = 'NULL'
-            }
             if (cnt === 0) SQL += ' WHERE '
             else SQL += ' AND '
-            if (!op) SQL += `${key} = ${value}`
-            else if (op === 'ne') SQL += `${key} != ${value}`
-            else if (op === 'ge') SQL += `${key} >= ${value}`
-            else if (op === 'le') SQL += `${key} <= ${value}`
-            else if (op === 'gt') SQL += `${key} > ${value}`
-            else if (op === 'lt') SQL += `${key} < ${value}`
-            else if (op === 'IN') SQL += `${key} IN (${value})`
-            else if (op === 'IS' || op === '@>') SQL += `${key} ${op} ${value}`
-            else SQL += `${key} = ${value}`
             cnt++
+            // parse the comparison operator
+            if (colType.indexOf('[]') > 0) {
+                if (value == null) {
+                    SQL += `${key} IS NULL`
+                } else {
+                    let valueList = value
+                    if (!Array.isArray(valueList)) {
+                        valueList = [value]
+                    }
+
+                    for (let i = 0; i <valueList.length; i++) {
+                        const v = valueList[i]
+                        if (i > 0) {
+                            SQL += ' AND '
+                        }
+                        if (Number.isNaN(Number(v))) {
+                            SQL += `'${v}' = ANY (${key})`
+                        } else {
+                            SQL += `${v} = ANY (${key})`
+                        }
+                    }
+                }
+            }else {
+                if (typeof value === 'string' && value.length > 3 && value[2] === ':') {
+                    op = value.substr(0,2).toLowerCase()
+                    value = value.substr(3)
+                } else if (value && Array.isArray(value) && value.length) {
+                    op = 'IN'
+                    let valueStr = ''
+                    for (let v of value) {
+                        const s = this.parseValueForSQLStatement(table, key, v)
+                        if (!s) continue
+                        if (valueStr === '') valueStr = s
+                        else valueStr += `, ${s}`
+                    }
+                    value = valueStr
+                } else if (colType === 'JSONB') {
+                    op = '@>'
+                    if (value && typeof value === 'object') {
+                        value = JSON.stringify(value)
+                    } 
+                }
+                if (op !== 'IN') {
+                    value = this.parseValueForSQLStatement(table, key, value)
+                }
+                if (typeof value === 'undefined' || value === null || value === '') {
+                    op = 'IS'
+                    value = 'NULL'
+                }
+                if (!op) SQL += `${key} = ${value}`
+                else if (op === 'ne') SQL += `${key} != ${value}`
+                else if (op === 'ge') SQL += `${key} >= ${value}`
+                else if (op === 'le') SQL += `${key} <= ${value}`
+                else if (op === 'gt') SQL += `${key} > ${value}`
+                else if (op === 'lt') SQL += `${key} < ${value}`
+                else if (op === 'IN') SQL += `${key} IN (${value})`
+                else if (op === 'IS' || op === '@>') SQL += `${key} ${op} ${value}`
+                else SQL += `${key} = ${value}`
+            }
         }
         return SQL
     }
@@ -455,6 +478,7 @@ export class Database extends StorageBase {
 
         SQL += ` LIMIT ${limit <=0 ? 'ALL' : limit} OFFSET ${offset};`
 
+        console.log('SQL of query:', SQL)
         const res = await this.query(SQL)
         if (res && res.rows) {
             if (res.rows.length === 0) return null
