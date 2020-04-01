@@ -1,0 +1,43 @@
+{
+    "services": [
+        {
+            "name": "echo",
+            "module": "/gateway/nginx",
+            "arguments": [
+                {
+                    "name": "msg",
+                    "type": "string"
+                }
+            ],
+            "returnType": "string",
+            "isAsync": false,
+            "filepath": "/gateway/nginx.ts"
+        },
+        {
+            "name": "setup",
+            "module": "/storage",
+            "arguments": [
+                {
+                    "name": "storageSettings",
+                    "type": "StorageSettings"
+                },
+                {
+                    "name": "databaseStructure?",
+                    "type": "any"
+                }
+            ],
+            "returnType": "PostgreSQL|FileStorage",
+            "isAsync": false,
+            "filepath": "/storage/index.ts"
+        },
+        {
+            "name": "StorageType",
+            "module": "/storage",
+            "arguments": [],
+            "returnType": "any",
+            "isAsync": false,
+            "filepath": "/storage/index.ts"
+        }
+    ],
+    "application": "sardines-built-in-services"
+}

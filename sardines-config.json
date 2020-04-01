@@ -1,0 +1,24 @@
+{
+  "application": "sardines-built-in-services",
+  "platform": "nodejs",
+  "exeDir": "./lib",
+  "srcRootDir": "./src",
+  "sardinesDir": "sardines",
+  "remoteServices": {},
+  "repositoryEntries": [{
+    "providerInfo": {
+      "protocol": "http",
+      "host": "nw-test",
+      "port": 8080,
+      "root": "/",
+      "driver": "sardines-service-driver-http"
+    },
+    "user": "sardines-shoal",
+    "password": "Sardines@2019"
+  }],
+  "drivers": [{
+    "name": "sardines-service-driver-http",
+    "locationType": "npm",
+    "protocols": ["http", "htpps"]
+  }]
+}

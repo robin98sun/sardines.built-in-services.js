@@ -36,7 +36,7 @@ const builtInFunctions = {
     'CURRENT_TIMESTAMP': true
 }
 
-export const getPgTimeSting = (t: Date): string => {
+const getPgTimeSting = (t: Date): string => {
     let str = `${t.getFullYear()}-${t.getMonth()<9?'0':''}${t.getMonth()+1}-${t.getDate()<10?'0':''}${t.getDate()}`
     str += ` ${t.getHours()<10?'0':''}${t.getHours()}:${t.getMinutes()<10?'0':''}${t.getMinutes()}:${t.getSeconds()<10?'0':''}${t.getSeconds()}`
     str += ` ${t.getTimezoneOffset()>=0?'-':'+'}${t.getTimezoneOffset()/60<10?'0':''}${Math.abs(Math.round(t.getTimezoneOffset()/60))}:${t.getTimezoneOffset()<10?'0':''}${t.getTimezoneOffset()%60}`
