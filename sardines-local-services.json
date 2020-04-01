@@ -29,14 +29,6 @@
             "returnType": "PostgreSQL|FileStorage",
             "isAsync": false,
             "filepath": "/storage/index.ts"
-        },
-        {
-            "name": "StorageType",
-            "module": "/storage",
-            "arguments": [],
-            "returnType": "any",
-            "isAsync": false,
-            "filepath": "/storage/index.ts"
         }
     ],
     "application": "sardines-built-in-services"
