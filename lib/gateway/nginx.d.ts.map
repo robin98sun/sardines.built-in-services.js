@@ -1,1 +1,1 @@
-{"version":3,"file":"nginx.d.ts","sourceRoot":"","sources":["../../src/gateway/nginx.ts"],"names":[],"mappings":"AAGA,eAAO,MAAM,IAAI,4CAgBhB,CAAA"}
+{"version":3,"file":"nginx.d.ts","sourceRoot":"","sources":["../../src/gateway/nginx.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAA;AAC/C,OAAO,EAAE,WAAW,EAAE,MAAM,iBAAiB,CAAA;AAE7C,eAAO,MAAM,IAAI,4CAgBhB,CAAA;AAED,eAAO,MAAM,MAAM,oCAclB,CAAA"}

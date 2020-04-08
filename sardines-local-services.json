@@ -29,6 +29,19 @@
             "returnType": "PostgreSQL|FileStorage",
             "isAsync": false,
             "filepath": "/storage/index.ts"
+        },
+        {
+            "name": "config",
+            "module": "/gateway/nginx",
+            "arguments": [
+                {
+                    "name": "configData?",
+                    "type": "any"
+                }
+            ],
+            "returnType": "any",
+            "isAsync": true,
+            "filepath": "/gateway/nginx.ts"
         }
     ],
     "application": "sardines-built-in-services"
