@@ -1,28 +1,3 @@
-export declare const drivers: {
-    [key: string]: any;
-};
-export declare const sardinesConfig: {
-    application: string;
-    platform: string;
-    exeDir: string;
-    srcRootDir: string;
-    sardinesDir: string;
-    remoteServices: {};
-    repositoryEntries: {
-        providerInfo: {
-            protocol: string;
-            host: string;
-            port: number;
-            root: string;
-            driver: string;
-        };
-        user: string;
-        password: string;
-    }[];
-    drivers: {
-        name: string;
-        locationType: string;
-        protocols: string[];
-    }[];
-};
+export { drivers } from './index.sardine';
+export { sardinesConfig } from './index.sardine';
 //# sourceMappingURL=index.d.ts.map
