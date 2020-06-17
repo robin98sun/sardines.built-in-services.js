@@ -1,19 +1,6 @@
 {
     "services": [
         {
-            "name": "echo",
-            "module": "/gateway/nginx",
-            "arguments": [
-                {
-                    "name": "msg",
-                    "type": "string"
-                }
-            ],
-            "returnType": "string",
-            "isAsync": false,
-            "filepath": "/gateway/nginx.ts"
-        },
-        {
             "name": "setup",
             "module": "/storage",
             "arguments": [
@@ -31,17 +18,12 @@
             "filepath": "/storage/index.ts"
         },
         {
-            "name": "config",
-            "module": "/gateway/nginx",
-            "arguments": [
-                {
-                    "name": "configData?",
-                    "type": "any"
-                }
-            ],
+            "name": "setup",
+            "module": "/access_point/nginx",
+            "arguments": [],
             "returnType": "any",
-            "isAsync": true,
-            "filepath": "/gateway/nginx.ts"
+            "isAsync": false,
+            "filepath": "/access_point/nginx/index.ts"
         }
     ],
     "application": "sardines-built-in-services"
