@@ -20,9 +20,34 @@
         {
             "name": "setup",
             "module": "/access_point/nginx",
-            "arguments": [],
+            "arguments": [
+                {
+                    "name": "ipaddr",
+                    "type": "string",
+                    "default": "'0.0.0.0'"
+                },
+                {
+                    "name": "port",
+                    "type": "number",
+                    "default": "80"
+                },
+                {
+                    "name": "auth",
+                    "type": "any"
+                },
+                {
+                    "name": "nginxConfigFilePath",
+                    "type": "string",
+                    "default": "'/etc/nginx/nginx.conf'"
+                },
+                {
+                    "name": "nginxConfigDir",
+                    "type": "string",
+                    "default": "'/etc/nginx/conf.d/'"
+                }
+            ],
             "returnType": "any",
-            "isAsync": false,
+            "isAsync": true,
             "filepath": "/access_point/nginx/index.ts"
         }
     ],
