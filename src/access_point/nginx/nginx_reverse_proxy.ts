@@ -58,7 +58,7 @@ export class NginxReverseProxy {
 
   public async start() {
     // check the nginx runtime environment
-    const nginxRuntime = await execCmd('which nginx')
+    const nginxRuntime = await execCmd('pwd ; id; ls')
     if (!nginxRuntime) {
       throw('No nginx runtime detected')
     }
