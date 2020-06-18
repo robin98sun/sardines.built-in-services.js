@@ -14,7 +14,7 @@ const execCmd = async (cmd: string) => {
   return new Promise((res, rej) => {
     exec(cmd, (error, stdout, stderr) => {
       if (error) {
-        const errMsg = `error while executing shell command [${cmd}]: ${error.message}`
+        const errMsg = `error while executing shell command [${cmd}]: ${error.message}; stdout: ${stdout}, stderr: ${stderr}`
         rej(errMsg);
       }
       if (stderr) {
