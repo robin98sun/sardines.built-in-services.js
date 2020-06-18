@@ -7,5 +7,9 @@ export const setup = async (
   nginxConfigDir: string = '/etc/nginx/conf.d/'
 ) => {
   proxy = new NginxReverseProxy(ipaddr, port, auth, nginxConfigFilePath, nginxConfigDir)
-  return await proxy.start()
+  const res = await proxy.start()
+  return {
+    res,
+    auth
+  }
 }
