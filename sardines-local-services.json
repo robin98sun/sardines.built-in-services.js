@@ -49,6 +49,14 @@
             "returnType": "any",
             "isAsync": true,
             "filepath": "/access_point/nginx/index.ts"
+        },
+        {
+            "name": "info",
+            "module": "/access_point/nginx",
+            "arguments": [],
+            "returnType": "any",
+            "isAsync": true,
+            "filepath": "/access_point/nginx/index.ts"
         }
     ],
     "application": "sardines-built-in-services"

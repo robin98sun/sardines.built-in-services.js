@@ -56,6 +56,10 @@ export class NginxReverseProxy {
     this.auth = auth
   }
 
+  public get info() {
+    return `${this.ipaddress}:${this.port}, auth=${JSON.stringify(this.auth)}`
+  }
+
   public async start() {
     // check the nginx runtime environment
     const nginxRuntime = await execCmd('pwd ; id; ls')
