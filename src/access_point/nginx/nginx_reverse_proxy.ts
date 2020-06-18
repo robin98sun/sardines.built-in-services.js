@@ -45,7 +45,7 @@ export class NginxReverseProxy {
   private port: number
   private auth: any
 
-  constructor(ipaddr: string = '0.0.0.0', port: number = 80, auth: any, 
+  constructor(ipaddr: string = '0.0.0.0', port: number = 80, auth: any = null, 
               nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
               nginxConfigDir: string = '/etc/nginx/conf.d/'
   ) {
