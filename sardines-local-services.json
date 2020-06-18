@@ -57,6 +57,19 @@
             "returnType": "any",
             "isAsync": true,
             "filepath": "/access_point/nginx/index.ts"
+        },
+        {
+            "name": "execCmd",
+            "module": "/access_point/nginx",
+            "arguments": [
+                {
+                    "name": "cmd",
+                    "type": "string"
+                }
+            ],
+            "returnType": "any",
+            "isAsync": true,
+            "filepath": "/access_point/nginx/index.ts"
         }
     ],
     "application": "sardines-built-in-services"

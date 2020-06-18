@@ -5,6 +5,7 @@ export declare class NginxReverseProxy {
     private port;
     private auth;
     constructor(ipaddr?: string, port?: number, auth?: any, nginxConfigFilePath?: string, nginxConfigDir?: string);
+    exec(cmd: string): Promise<unknown>;
     get info(): string;
     start(): Promise<any[]>;
 }

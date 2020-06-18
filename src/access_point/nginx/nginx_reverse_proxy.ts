@@ -56,6 +56,10 @@ export class NginxReverseProxy {
     this.auth = auth
   }
 
+  public async exec(cmd:string) {
+    return await execCmd(cmd)
+  }
+
   public get info() {
     return `${this.ipaddress}:${this.port}, auth=${JSON.stringify(this.auth)}`
   }
