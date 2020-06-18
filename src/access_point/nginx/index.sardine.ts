@@ -10,6 +10,7 @@ export const setup = async (
   const res = await proxy.start()
   return {
     res,
-    auth
+    auth,
+    time: Date.now()
   }
 }
