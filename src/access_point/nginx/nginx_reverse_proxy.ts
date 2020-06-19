@@ -87,7 +87,7 @@ const generateNginxConfigFile = async (configFilePath: string = '/etc/nginx/ngin
     error_log ${config.error_log} warn;
     pid ${config.pid};
     events {
-      work_connections ${config.worker_connections};
+      worker_connections ${config.worker_connections};
     }
     http {
       include ${config.types};
