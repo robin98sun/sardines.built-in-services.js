@@ -64,9 +64,9 @@ export const defaultNginxConfig: NginxConfig = {
   types: '/etc/nginx/mime.types',
   default_type: 'application/octet-stream',
   log_format: [
-    '$remote_addr - $remote_user [$time_local] "$request" ', 
-    '$status $body_bytes_sent "$http_referer" ',
-    '"$http_user_agent" "$http_x_forwarded_for"'
+    '\'$remote_addr - $remote_user [$time_local] "$request"\'', 
+    '\'$status $body_bytes_sent "$http_referer"\'',
+    '\'"$http_user_agent" "$http_x_forwarded_for"\''
   ],
   access_log: '/var/log/nginx/access.log',
   sendfile: 'on',
