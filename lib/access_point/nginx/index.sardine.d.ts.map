@@ -1,1 +1,1 @@
-{"version":3,"file":"index.sardine.d.ts","sourceRoot":"","sources":["../../../src/access_point/nginx/index.sardine.ts"],"names":[],"mappings":"AAAA,OAAO,EAAqB,WAAW,EAAE,MAAM,uBAAuB,CAAA;AAGtE,eAAO,MAAM,KAAK;;;EAQjB,CAAA;AAED,eAAO,MAAM,OAAO,mCAGnB,CAAA"}
+{"version":3,"file":"index.sardine.d.ts","sourceRoot":"","sources":["../../../src/access_point/nginx/index.sardine.ts"],"names":[],"mappings":"AAAA,OAAO,EAAqB,WAAW,EAAE,MAAM,uBAAuB,CAAA;AAGtE,eAAO,MAAM,KAAK;;EAQjB,CAAA;AAED,eAAO,MAAM,OAAO,mCAGnB,CAAA"}
