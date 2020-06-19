@@ -2,23 +2,6 @@
     "services": [
         {
             "name": "setup",
-            "module": "/storage",
-            "arguments": [
-                {
-                    "name": "storageSettings",
-                    "type": "StorageSettings"
-                },
-                {
-                    "name": "databaseStructure?",
-                    "type": "any"
-                }
-            ],
-            "returnType": "PostgreSQL|FileStorage",
-            "isAsync": false,
-            "filepath": "/storage/index.ts"
-        },
-        {
-            "name": "setup",
             "module": "/access_point/nginx",
             "arguments": [
                 {
@@ -55,14 +38,6 @@
             "filepath": "/access_point/nginx/index.ts"
         },
         {
-            "name": "info",
-            "module": "/access_point/nginx",
-            "arguments": [],
-            "returnType": "any",
-            "isAsync": true,
-            "filepath": "/access_point/nginx/index.ts"
-        },
-        {
             "name": "execCmd",
             "module": "/access_point/nginx",
             "arguments": [
@@ -74,6 +49,23 @@
             "returnType": "any",
             "isAsync": true,
             "filepath": "/access_point/nginx/index.ts"
+        },
+        {
+            "name": "setup",
+            "module": "/storage",
+            "arguments": [
+                {
+                    "name": "storageSettings",
+                    "type": "StorageSettings"
+                },
+                {
+                    "name": "databaseStructure?",
+                    "type": "any"
+                }
+            ],
+            "returnType": "PostgreSQL|FileStorage",
+            "isAsync": false,
+            "filepath": "/storage/index.ts"
         }
     ],
     "application": "sardines-built-in-services"

@@ -43,7 +43,7 @@
     "scripts": {
         "test": "mocha -r ts-node/register --exit test/unit_tests/**/*.ts",
         "build": "npm run clear && tsc --build conf/tsconfig.json",
-        "compile": "sardines-compile ./src --gen-services --recompile",
+        "compile": "rm -f sardines-local-services.json && sardines-compile ./src --gen-services --recompile",
         "reverseCompile": "sardines-compile --reverse ./src",
         "clear": "rm -rf lib/*",
         "prepublish": "npm run build && npm run test",
