@@ -149,6 +149,7 @@ export class NginxReverseProxy {
     }
     
     // generate the config file using the initialization parameters
+    await execCmd('/usr/sbin/service nginx stop')
     await generateNginxConfigFile(this.nginxConfigFilePath, this.nginxConfig)
     const newConfigFileContent = await fs.readFileSync(this.nginxConfigFilePath, {encoding: 'utf8'})
 
