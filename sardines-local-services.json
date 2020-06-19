@@ -44,6 +44,10 @@
                     "name": "nginxConfigDir",
                     "type": "string",
                     "default": "'/etc/nginx/conf.d/'"
+                },
+                {
+                    "name": "nginxConfig",
+                    "type": "NginxConfig"
                 }
             ],
             "returnType": "any",
