@@ -83,7 +83,7 @@ const generateNginxConfigFile = async (configFilePath: string = '/etc/nginx/ngin
   }
   let content: string = `
     user ${config.user};
-    work_processes ${config.worker_processes};
+    worker_processes ${config.worker_processes};
     error_log ${config.error_log} warn;
     pid ${config.pid};
     events {
