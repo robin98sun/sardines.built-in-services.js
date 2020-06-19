@@ -154,11 +154,16 @@ export class NginxReverseProxy {
     const newConfigFileContent = await fs.readFileSync(this.nginxConfigFilePath, {encoding: 'utf8'})
     
     // restart nginx service
-    // const restartResult = await execCmd(`/usr/sbin/service nginx restart`)
-
-    // read the current config file
-    return {nginxConfigFile: newConfigFileContent }
-    // return {nginxConfigFile: newConfigFileContent, serviceRestartResult: restartResult}
+    let restartResult: any = ''
+    try {
+      restartResult = await execCmd(`/usr/sbin/service nginx start`)
+    } catch(e) {
+      restartResult = await execCmd('/usr/sbin/service nginx status')
+      if (restartResult === 'nginx is running.\n') {
+        return true
+      }
+    }
+    throw `nginx is not started`
   }
 
   // private getPathForServiceRuntime(sr: ServiceRuntimeIdentityInReverseProxy) {

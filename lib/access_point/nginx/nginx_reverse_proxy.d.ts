@@ -35,8 +35,6 @@ export declare class NginxReverseProxy {
     private nginxConfig;
     constructor(ipaddr?: string, port?: number, auth?: any, nginxConfigFilePath?: string, nginxConfigDir?: string, nginxConfigSettings?: NginxConfig);
     exec(cmd: string): Promise<unknown>;
-    start(): Promise<{
-        nginxConfigFile: string;
-    }>;
+    start(): Promise<boolean>;
 }
 //# sourceMappingURL=nginx_reverse_proxy.d.ts.map
