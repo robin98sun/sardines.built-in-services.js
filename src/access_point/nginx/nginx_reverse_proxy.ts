@@ -77,7 +77,7 @@ export const defaultNginxConfig: NginxConfig = {
 }
 
 const generateNginxConfigFile = async (configFilePath: string = '/etc/nginx/nginx.conf', configSettings: NginxConfig = defaultNginxConfig) => {
-  const config: NginxConfig = Object.assign({}, configSettings, defaultNginxConfig)
+  const config: NginxConfig = Object.assign({}, defaultNginxConfig, configSettings)
   if (!fs.existsSync(configFilePath)) {
     throw `Can not access nginx config file [${configFilePath}]`
   }
@@ -125,7 +125,7 @@ export class NginxReverseProxy {
     this.ipaddress = ipaddr
     this.port = port
     this.auth = auth
-    this.nginxConfig = Object.assign({}, nginxConfigSettings, defaultNginxConfig)
+    this.nginxConfig = Object.assign({}, defaultNginxConfig, nginxConfigSettings)
   }
 
   public async exec(cmd:string) {
