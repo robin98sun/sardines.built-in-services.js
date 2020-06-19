@@ -37,7 +37,6 @@ export declare class NginxReverseProxy {
     exec(cmd: string): Promise<unknown>;
     start(): Promise<{
         nginxConfigFile: string;
-        serviceRestartResult: unknown;
     }>;
 }
 //# sourceMappingURL=nginx_reverse_proxy.d.ts.map
