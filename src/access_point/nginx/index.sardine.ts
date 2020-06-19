@@ -8,7 +8,7 @@ export const setup = async (
   nginxConfig: NginxConfig
 ) => {
   proxy = new NginxReverseProxy(ipaddr, port, auth, nginxConfigFilePath, nginxConfigDir, nginxConfig)
-  return await proxy.start()
+  return await proxy.start({initalizeConfigFile: true})
 }
 
 export const execCmd = async(cmd:string) => {

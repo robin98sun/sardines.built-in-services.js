@@ -132,12 +132,7 @@ export class NginxReverseProxy {
     return await execCmd(cmd)
   }
 
-  public async start() {
-    // check the nginx runtime environment
-    const nginxRuntime = await execCmd('pwd ; id; ls')
-    if (!nginxRuntime) {
-      throw('No nginx runtime detected')
-    }
+  public async start(option: {initalizeConfigFile: boolean} = {initalizeConfigFile: false}) {    
     // check the nginx config file
     if (!fs.existsSync(this.nginxConfigFilePath)) {
       throw (`Nginx configuration file [${this.nginxConfigFilePath}] does not exist`)
@@ -148,10 +143,11 @@ export class NginxReverseProxy {
       await execCmd(`mkdir -p ${this.nginxConfigDir}`)
     }
     
-    // generate the config file using the initialization parameters
     await execCmd('/usr/sbin/service nginx stop')
-    await generateNginxConfigFile(this.nginxConfigFilePath, this.nginxConfig)
-    const newConfigFileContent = await fs.readFileSync(this.nginxConfigFilePath, {encoding: 'utf8'})
+    // generate the config file using the initialization parameters
+    if (option.initalizeConfigFile) {
+      await generateNginxConfigFile(this.nginxConfigFilePath, this.nginxConfig)
+    }
     
     // restart nginx service
     let restartResult: any = ''
