@@ -152,7 +152,7 @@ export class NginxReverseProxy {
     await generateNginxConfigFile(this.nginxConfigFilePath, this.nginxConfig)
 
     // restart nginx service
-    const restartResult = await execCmd(`/use/sbin/service nginx restart`)
+    const restartResult = await execCmd(`/usr/sbin/service nginx restart`)
 
     // read the current config file
     const newConfigFileContent = await fs.readFileSync(this.nginxConfigFilePath, {encoding: 'utf8'})
