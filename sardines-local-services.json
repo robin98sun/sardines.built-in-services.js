@@ -19,14 +19,14 @@
                     "default": "'/etc/nginx/conf.d/'"
                 },
                 {
-                    "name": "sslCrt",
-                    "type": "string",
-                    "default": "''"
+                    "name": "sslCrtLines",
+                    "type": "string[]",
+                    "default": "[]"
                 },
                 {
-                    "name": "sslKey",
-                    "type": "string",
-                    "default": "''"
+                    "name": "sslKeyLines",
+                    "type": "string[]",
+                    "default": "[]"
                 }
             ],
             "returnType": "any",

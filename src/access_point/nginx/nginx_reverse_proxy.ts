@@ -122,15 +122,23 @@ export class NginxReverseProxy {
     nginxConfigSettings: NginxConfig = defaultNginxConfig,
     nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
     nginxConfigDir: string = '/etc/nginx/conf.d/',
-    sslCrt: string = '',
-    sslKey: string = ''
+    sslCrtLines: string[] = [],
+    sslKeyLines: string[] = []
   ) {
 
     this.nginxConfigFilePath = nginxConfigFilePath
     this.nginxConfigDir = nginxConfigDir
     this.nginxConfig = Object.assign({}, defaultNginxConfig, nginxConfigSettings)
-    this.sslCrt = sslCrt
-    this.sslKey = sslKey
+    if (sslCrtLines && sslCrtLines.length) {
+      this.sslCrt = sslCrtLines.join('\n')
+    } else {
+      this.sslCrt = ''
+    }
+    if (sslKeyLines && sslKeyLines.length) {
+      this.sslKey = sslKeyLines.join('\n')
+    } else {
+      this.sslKey = ''
+    }
   }
 
   public async exec(cmd:string) {

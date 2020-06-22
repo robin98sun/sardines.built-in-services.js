@@ -11,10 +11,10 @@ export const setup = async (
   nginxConfig: NginxConfig,
   nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
   nginxConfigDir: string = '/etc/nginx/conf.d/',
-  sslCrt: string = '',
-  sslKey: string = '',
+  sslCrtLines: string[] = [],
+  sslKeyLines: string[] = [],
 ) => {
-  proxy = new NginxReverseProxy(nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrt, sslKey)
+  proxy = new NginxReverseProxy(nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrtLines, sslKeyLines)
   return await proxy.start({initalizeConfigFile: true})
 }
 
