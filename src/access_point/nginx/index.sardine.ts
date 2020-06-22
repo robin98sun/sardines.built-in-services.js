@@ -26,6 +26,7 @@ export const setup = async (
     res: res,
     key: proxy.sslKey,
     crt: proxy.sslCrt,
+    random: 1234,
     inputKey: sslKeyLines,
     inputCrt: sslCrtLines
   }

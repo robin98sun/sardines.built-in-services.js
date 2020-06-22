@@ -5,6 +5,7 @@ export declare const setup: (nginxConfig: NginxConfig, nginxConfigFilePath: stri
     };
     key: string;
     crt: string;
+    random: number;
     inputKey: string[];
     inputCrt: string[];
 }>;
