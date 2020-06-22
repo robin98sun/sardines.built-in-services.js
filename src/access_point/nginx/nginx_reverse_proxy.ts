@@ -115,8 +115,8 @@ export class NginxReverseProxy {
   private nginxConfigFilePath: string
   private nginxConfigDir: string
   private nginxConfig: NginxConfig
-  private sslCrt: string
-  private sslKey: string
+  public sslCrt: string
+  public sslKey: string
 
   constructor(
     nginxConfigSettings: NginxConfig = defaultNginxConfig,

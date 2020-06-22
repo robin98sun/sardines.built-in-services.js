@@ -1,28 +1,51 @@
-import * as proc from 'process'
-import * as path from 'path'
+import * as origin from './index.sardine'
+import { Core } from 'sardines-core'
+import { NginxConfig } from './nginx_reverse_proxy'
 
-
-import { NginxReverseProxy, NginxConfig } from './nginx_reverse_proxy'
-
-
-let proxy: NginxReverseProxy|null = null
-
-export const setup = async (
-  nginxConfig: NginxConfig,
-  nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
-  nginxConfigDir: string = '/etc/nginx/conf.d/',
-  sslCrtLines: string[] = [],
-  sslKeyLines: string[] = [],
-) => {
-  proxy = new NginxReverseProxy(nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrtLines, sslKeyLines)
-  return await proxy.start({initalizeConfigFile: true})
+export const setup = async (nginxConfig: NginxConfig, nginxConfigFilePath:string = '/etc/nginx/nginx.conf', nginxConfigDir: string = '/etc/nginx/conf.d/', sslCrtLines: string[] = [], sslKeyLines: string[] = []) => {
+    if (Core.isRemote('sardines-built-in-services', '/access_point/nginx', 'setup')) {
+        return await Core.invoke({
+            identity: {
+                application: 'sardines-built-in-services',
+                module: '/access_point/nginx',
+                name: 'setup',
+                version: '*'
+            },
+            entries: []
+        }, nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrtLines, sslKeyLines)
+    } else {
+        return await origin.setup(nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrtLines, sslKeyLines)
+    }
 }
 
-export const execCmd = async(cmd:string) => {
-  if (!proxy) return null
-  else return await proxy.exec(cmd)
+export const execCmd = async (cmd:string) => {
+    if (Core.isRemote('sardines-built-in-services', '/access_point/nginx', 'execCmd')) {
+        return await Core.invoke({
+            identity: {
+                application: 'sardines-built-in-services',
+                module: '/access_point/nginx',
+                name: 'execCmd',
+                version: '*'
+            },
+            entries: []
+        }, cmd)
+    } else {
+        return await origin.execCmd(cmd)
+    }
 }
 
-export const test = async() => {
-  return `current dir: ${proc.cwd()}, key dir: ${path.resolve(proc.cwd(), './keys')}`
+export const test = async () => {
+    if (Core.isRemote('sardines-built-in-services', '/access_point/nginx', 'test')) {
+        return await Core.invoke({
+            identity: {
+                application: 'sardines-built-in-services',
+                module: '/access_point/nginx',
+                name: 'test',
+                version: '*'
+            },
+            entries: []
+        })
+    } else {
+        return await origin.test()
+    }
 }

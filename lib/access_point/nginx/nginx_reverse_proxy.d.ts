@@ -36,8 +36,8 @@ export declare class NginxReverseProxy {
     private nginxConfigFilePath;
     private nginxConfigDir;
     private nginxConfig;
-    private sslCrt;
-    private sslKey;
+    sslCrt: string;
+    sslKey: string;
     constructor(nginxConfigSettings?: NginxConfig, nginxConfigFilePath?: string, nginxConfigDir?: string, sslCrtLines?: string[], sslKeyLines?: string[]);
     exec(cmd: string): Promise<unknown>;
     start(option?: {
