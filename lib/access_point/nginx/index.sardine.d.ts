@@ -8,6 +8,7 @@ export declare const setup: (nginxConfig: NginxConfig, nginxConfigFilePath: stri
     random: number;
     inputKey: string[];
     inputCrt: string[];
+    fakeInput: string[][];
 }>;
 export declare const execCmd: (cmd: string) => Promise<unknown>;
 export declare const test: () => Promise<string | null>;
