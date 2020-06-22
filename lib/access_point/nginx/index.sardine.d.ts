@@ -1,6 +1,8 @@
 import { NginxConfig } from './nginx_reverse_proxy';
 export declare const setup: (nginxConfig: NginxConfig, nginxConfigFilePath?: string, nginxConfigDir?: string, sslCrtLines?: string[], sslKeyLines?: string[]) => Promise<{
-    res: boolean;
+    res: boolean | {
+        error: any;
+    };
     key: string;
     crt: string;
     inputKey: string[];

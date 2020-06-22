@@ -15,7 +15,13 @@ export const setup = async (
   sslKeyLines: string[] = [],
 ) => {
   proxy = new NginxReverseProxy(nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrtLines, sslKeyLines)
-  const res = await proxy.start({initalizeConfigFile: true})
+  let res = null
+  try {
+    res = await proxy.start({initalizeConfigFile: true})
+  }catch(e) {
+    res = {error: e}
+  }
+  
   return {
     res: res,
     key: proxy.sslKey,
