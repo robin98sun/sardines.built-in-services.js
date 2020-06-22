@@ -1,4 +1,5 @@
 import { NginxConfig } from './nginx_reverse_proxy';
-export declare const setup: (ipaddr: string | undefined, port: number | undefined, auth: any, nginxConfigFilePath: string | undefined, nginxConfigDir: string | undefined, nginxConfig: NginxConfig) => Promise<any>;
+export declare const setup: (nginxConfig: NginxConfig, nginxConfigFilePath?: string, nginxConfigDir?: string, sslCrt?: string, sslKey?: string) => Promise<any>;
 export declare const execCmd: (cmd: string) => Promise<any>;
+export declare const test: () => Promise<any>;
 //# sourceMappingURL=index.d.ts.map

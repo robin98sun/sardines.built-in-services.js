@@ -5,18 +5,8 @@
             "module": "/access_point/nginx",
             "arguments": [
                 {
-                    "name": "ipaddr",
-                    "type": "string",
-                    "default": "'0.0.0.0'"
-                },
-                {
-                    "name": "port",
-                    "type": "number",
-                    "default": "80"
-                },
-                {
-                    "name": "auth",
-                    "type": "any"
+                    "name": "nginxConfig",
+                    "type": "NginxConfig"
                 },
                 {
                     "name": "nginxConfigFilePath",
@@ -29,8 +19,14 @@
                     "default": "'/etc/nginx/conf.d/'"
                 },
                 {
-                    "name": "nginxConfig",
-                    "type": "NginxConfig"
+                    "name": "sslCrt",
+                    "type": "string",
+                    "default": "''"
+                },
+                {
+                    "name": "sslKey",
+                    "type": "string",
+                    "default": "''"
                 }
             ],
             "returnType": "any",
@@ -46,6 +42,14 @@
                     "type": "string"
                 }
             ],
+            "returnType": "any",
+            "isAsync": true,
+            "filepath": "/access_point/nginx/index.ts"
+        },
+        {
+            "name": "test",
+            "module": "/access_point/nginx",
+            "arguments": [],
             "returnType": "any",
             "isAsync": true,
             "filepath": "/access_point/nginx/index.ts"

@@ -9,6 +9,8 @@
 
 import { exec } from 'child_process'
 import * as fs from 'fs'
+// import * as path from 'path'
+// import { Http } from 'sardines-core'
 
 const execCmd = async (cmd: string) => {
   return new Promise((res, rej) => {
@@ -26,16 +28,22 @@ const execCmd = async (cmd: string) => {
   })
 }
 
-export interface ServiceRuntimeIdentityInReverseProxy {
+export interface ServiceRuntimeIdentityInHttpReverseProxy {
   application: string, 
   module: string,
   name: string,
   version: string,
   method?: string,
   tags?: string[],
-  address: string,
-  port: number,
-  priority?: number
+  source: {
+    server: string
+    port: number
+  }
+  priority?: number,
+  target: {
+    server: string
+    port: number
+  }
 }
 
 export interface NginxConfig {
@@ -106,26 +114,23 @@ const generateNginxConfigFile = async (configFilePath: string = '/etc/nginx/ngin
 export class NginxReverseProxy {
   private nginxConfigFilePath: string
   private nginxConfigDir: string
-  private ipaddress: string
-  private port: number
-  private auth: any
   private nginxConfig: NginxConfig
+  private sslCrt: string
+  private sslKey: string
 
   constructor(
-    ipaddr: string = '0.0.0.0', 
-    port: number = 80, 
-    auth: any = null, 
+    nginxConfigSettings: NginxConfig = defaultNginxConfig,
     nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
     nginxConfigDir: string = '/etc/nginx/conf.d/',
-    nginxConfigSettings: NginxConfig = defaultNginxConfig
+    sslCrt: string = '',
+    sslKey: string = ''
   ) {
 
     this.nginxConfigFilePath = nginxConfigFilePath
     this.nginxConfigDir = nginxConfigDir
-    this.ipaddress = ipaddr
-    this.port = port
-    this.auth = auth
     this.nginxConfig = Object.assign({}, defaultNginxConfig, nginxConfigSettings)
+    this.sslCrt = sslCrt
+    this.sslKey = sslKey
   }
 
   public async exec(cmd:string) {

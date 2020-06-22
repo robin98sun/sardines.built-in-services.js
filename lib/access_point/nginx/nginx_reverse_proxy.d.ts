@@ -1,13 +1,19 @@
-export interface ServiceRuntimeIdentityInReverseProxy {
+export interface ServiceRuntimeIdentityInHttpReverseProxy {
     application: string;
     module: string;
     name: string;
     version: string;
     method?: string;
     tags?: string[];
-    address: string;
-    port: number;
+    source: {
+        server: string;
+        port: number;
+    };
     priority?: number;
+    target: {
+        server: string;
+        port: number;
+    };
 }
 export interface NginxConfig {
     user?: string;
@@ -29,11 +35,10 @@ export declare const defaultNginxConfig: NginxConfig;
 export declare class NginxReverseProxy {
     private nginxConfigFilePath;
     private nginxConfigDir;
-    private ipaddress;
-    private port;
-    private auth;
     private nginxConfig;
-    constructor(ipaddr?: string, port?: number, auth?: any, nginxConfigFilePath?: string, nginxConfigDir?: string, nginxConfigSettings?: NginxConfig);
+    private sslCrt;
+    private sslKey;
+    constructor(nginxConfigSettings?: NginxConfig, nginxConfigFilePath?: string, nginxConfigDir?: string, sslCrt?: string, sslKey?: string);
     exec(cmd: string): Promise<unknown>;
     start(option?: {
         initalizeConfigFile: boolean;
