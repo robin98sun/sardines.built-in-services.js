@@ -122,8 +122,8 @@ export class NginxReverseProxy {
     nginxConfigSettings: NginxConfig = defaultNginxConfig,
     nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
     nginxConfigDir: string = '/etc/nginx/conf.d/',
-    sslCrtLines: string[] = [],
-    sslKeyLines: string[] = []
+    sslCrtLines: string[],
+    sslKeyLines: string[]
   ) {
 
     this.nginxConfigFilePath = nginxConfigFilePath
