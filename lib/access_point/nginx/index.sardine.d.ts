@@ -1,5 +1,5 @@
 import { NginxConfig } from './nginx_reverse_proxy';
-export declare const setup: (nginxConfig: NginxConfig, nginxConfigFilePath?: string, nginxConfigDir?: string, sslCrtLines?: string[], sslKeyLines?: string[]) => Promise<{
+export declare const setup: (nginxConfig: NginxConfig, nginxConfigFilePath: string | undefined, nginxConfigDir: string | undefined, sslCrtLines: string[], sslKeyLines: string[]) => Promise<{
     res: boolean | {
         error: any;
     };

@@ -11,8 +11,8 @@ export const setup = async (
   nginxConfig: NginxConfig,
   nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
   nginxConfigDir: string = '/etc/nginx/conf.d/',
-  sslCrtLines: string[] = [],
-  sslKeyLines: string[] = [],
+  sslCrtLines: string[],
+  sslKeyLines: string[],
 ) => {
   proxy = new NginxReverseProxy(nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrtLines, sslKeyLines)
   let res = null

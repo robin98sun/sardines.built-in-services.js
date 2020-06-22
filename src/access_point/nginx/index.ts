@@ -2,7 +2,7 @@ import * as origin from './index.sardine'
 import { Core } from 'sardines-core'
 import { NginxConfig } from './nginx_reverse_proxy'
 
-export const setup = async (nginxConfig: NginxConfig, nginxConfigFilePath:string = '/etc/nginx/nginx.conf', nginxConfigDir: string = '/etc/nginx/conf.d/', sslCrtLines: string[] = [], sslKeyLines: string[] = []) => {
+export const setup = async (nginxConfig: NginxConfig, nginxConfigFilePath:string = '/etc/nginx/nginx.conf', nginxConfigDir: string = '/etc/nginx/conf.d/', sslCrtLines: string[], sslKeyLines: string[]) => {
     if (Core.isRemote('sardines-built-in-services', '/access_point/nginx', 'setup')) {
         return await Core.invoke({
             identity: {

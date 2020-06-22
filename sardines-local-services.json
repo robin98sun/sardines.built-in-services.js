@@ -20,13 +20,11 @@
                 },
                 {
                     "name": "sslCrtLines",
-                    "type": "string[]",
-                    "default": "[]"
+                    "type": "string[]"
                 },
                 {
                     "name": "sslKeyLines",
-                    "type": "string[]",
-                    "default": "[]"
+                    "type": "string[]"
                 }
             ],
             "returnType": "any",
