@@ -3,6 +3,8 @@ export declare const setup: (nginxConfig: NginxConfig, nginxConfigFilePath?: str
     res: boolean;
     key: string;
     crt: string;
+    inputKey: string[];
+    inputCrt: string[];
 }>;
 export declare const execCmd: (cmd: string) => Promise<unknown>;
 export declare const test: () => Promise<string | null>;

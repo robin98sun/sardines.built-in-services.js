@@ -19,7 +19,9 @@ export const setup = async (
   return {
     res: res,
     key: proxy.sslKey,
-    crt: proxy.sslCrt
+    crt: proxy.sslCrt,
+    inputKey: sslKeyLines,
+    inputCrt: sslCrtLines
   }
 }
 
