@@ -1,5 +1,6 @@
 import * as proc from 'process'
 import * as path from 'path'
+import { utils } from 'sardines-core'
 
 
 import { NginxReverseProxy, NginxConfig } from './nginx_reverse_proxy'
@@ -21,6 +22,9 @@ export const setup = async (
   }catch(e) {
     res = {error: e}
   }
+
+  console.log('DEBUG: nginx proxy setup, input parameter', 'sslCrtLines', utils.inspect(sslCrtLines))
+  console.log('DEBUG: nginx proxy setup, input parameter', 'sslKeyLines', utils.inspect(sslKeyLines))
   
   return {
     res: res,
