@@ -466,7 +466,7 @@ export class Database extends StorageBase {
         let SQL = ''
         if (distinct.length === 0) {
             SQL = `SELECT * FROM ${fullTableName}`
-        } else {
+        } else if (distinct) {
             SQL = `SELECT DISTINCT ${distinct.join(', ')} FROM ${fullTableName}`
         }
 
@@ -480,12 +480,27 @@ export class Database extends StorageBase {
 
         console.log('SQL of query:', SQL)
         const res = await this.query(SQL)
+        let result = null
         if (res && res.rows) {
             if (res.rows.length === 0) return null
-            if (res.rows.length === 1) return res.rows[0]
-            else return res.rows
+            if (res.rows.length === 1) {
+                result = res.rows[0]
+            } else {
+                result = res.rows
+            }
         }
-        return res
+        if (distinct && distinct.length === 1) {
+            if (Array.isArray(result)) {
+                result = result.map((item: any) => {
+                    if (typeof item === 'object' && typeof item[distinct[0]] != 'undefined') {
+                        return item[distinct[0]]
+                    } else return item
+                })
+            } else if (typeof result === 'object' && typeof result[distinct[0]] != 'undefined') {
+                result = result[distinct[0]]
+            }
+        }
+        return result
     }
 
     async set(table:string, obj: any, identities?: any): Promise<any>{
