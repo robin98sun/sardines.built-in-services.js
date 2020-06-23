@@ -478,7 +478,7 @@ export class Database extends StorageBase {
 
         SQL += ` LIMIT ${limit <=0 ? 'ALL' : limit} OFFSET ${offset};`
 
-        console.log('SQL of query:', SQL)
+        // console.log('SQL of query:', SQL)
         const res = await this.query(SQL)
         let result = null
         if (res && res.rows) {
@@ -500,7 +500,7 @@ export class Database extends StorageBase {
                 result = result[distinct[0]]
             }
         }
-        console.log(`result of query [${SQL}]:`, result)
+        // console.log(`result of query [${SQL}]:`, result)
         return result
     }
 
