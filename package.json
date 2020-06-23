@@ -51,5 +51,5 @@
         "publishSardines": "npm run compile && npm run build && sardines-publish --git-remote=test --verbose; npm run reverseCompile"
     },
     "type": "lib/index.d.ts",
-    "version": "1.0.24"
+    "version": "1.0.25"
 }
