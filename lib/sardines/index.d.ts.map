@@ -1,1 +1,1 @@
-{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../src/sardines/index.ts"],"names":[],"mappings":"AAmBA,eAAO,MAAM,OAAO,EAAE;IAAC,CAAC,GAAG,EAAC,MAAM,GAAE,GAAG,CAAA;CAEtC,CAAA;AAED,eAAO,MAAM,cAAc;;;;;;;;;;;;;;;;;;;;;;;CA8B1B,CAAA"}
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../src/sardines/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,iBAAiB,CAAA;AACzC,OAAO,EAAE,cAAc,EAAE,MAAM,iBAAiB,CAAA"}
