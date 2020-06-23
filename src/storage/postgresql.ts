@@ -496,11 +496,11 @@ export class Database extends StorageBase {
                         return item[distinct[0]]
                     } else return item
                 })
-            } else if (typeof result === 'object' && typeof result[distinct[0]] != 'undefined') {
+            } else if (typeof result === 'object' && typeof result[distinct[0]] !== 'undefined') {
                 result = result[distinct[0]]
             }
         }
-        console.log(`result of sql [${SQL}]:`, result)
+        console.log(`result of query [${SQL}]:`, result)
         return result
     }
 
