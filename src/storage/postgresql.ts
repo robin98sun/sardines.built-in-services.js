@@ -492,7 +492,7 @@ export class Database extends StorageBase {
         if (distinct && distinct.length === 1) {
             if (Array.isArray(result)) {
                 result = result.map((item: any) => {
-                    if (typeof item === 'object' && typeof item[distinct[0]] != 'undefined') {
+                    if (typeof item === 'object' && typeof item[distinct[0]] !== 'undefined') {
                         return item[distinct[0]]
                     } else return item
                 })
@@ -500,6 +500,7 @@ export class Database extends StorageBase {
                 result = result[distinct[0]]
             }
         }
+        console.log(`result of sql [${SQL}]:`, result)
         return result
     }
 
