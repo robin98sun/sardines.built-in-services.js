@@ -128,7 +128,7 @@ const generateNginxConfigFile = async (
       sendfile ${config.sendfile};
       tcp_nopush ${config.tcp_nopush};
       gzip ${config.gzip};
-      include ${config.servers};
+      include ${config.servers}/*.conf;
     }
   `
   fs.writeFileSync(configFilePath, content, {encoding: 'utf8'})
@@ -138,8 +138,8 @@ export class NginxReverseProxy {
   private nginxConfigFilePath: string
   private nginxConfigDir: string
   private nginxConfig: NginxConfig
-  public sslCrt: string
-  public sslKey: string
+  private sslCrt: string
+  private sslKey: string
 
   constructor(
     nginxConfigSettings: NginxConfig = defaultNginxConfig,

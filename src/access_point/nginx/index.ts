@@ -25,18 +25,11 @@ export const setup = async (
 
   return {
     res: res,
-    key: proxy.sslKey,
-    crt: proxy.sslCrt,
-    random: 1234,
+    timestamp: Date.now()
   }
 }
 
 export const execCmd = async(cmd:string) => {
   if (!proxy) return null
   else return await proxy.exec(cmd)
-}
-
-export const test = async() => {
-  if (!proxy) return null
-  return `current dir: ${proc.cwd()}, key dir: ${path.resolve(proc.cwd(), './keys')}, key: ${proxy!.sslKey}, crt: ${proxy!.sslCrt}`
 }

@@ -47,7 +47,7 @@
         "reverseCompile": "sardines-compile --reverse ./src",
         "clear": "rm -rf lib/*",
         "prepublish": "npm run build && npm run test",
-        "publishSardines": "npm run clear && sardines-init && npm run compile && npm run build && npm run reverseCompile && sardines-publish --git-remote=test --verbose"
+        "publishSardines": "rm -f sardines-local-services.json && npm run clear && sardines-init && npm run compile && npm run build && npm run reverseCompile && sardines-publish --git-remote=test --verbose"
     },
     "type": "lib/index.d.ts",
     "version": "1.0.30"

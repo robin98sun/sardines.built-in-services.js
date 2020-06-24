@@ -45,14 +45,6 @@
             "filepath": "/access_point/nginx/index.ts"
         },
         {
-            "name": "test",
-            "module": "/access_point/nginx",
-            "arguments": [],
-            "returnType": "any",
-            "isAsync": true,
-            "filepath": "/access_point/nginx/index.ts"
-        },
-        {
             "name": "setup",
             "module": "/storage",
             "arguments": [
