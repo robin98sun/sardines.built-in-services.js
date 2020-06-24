@@ -23,10 +23,6 @@ export const setup = async (
     res = {error: e}
   }
 
-  console.log('DEBUG: nginx proxy setup, input parameter', 'nginxConfig', utils.inspect(nginxConfig))
-  console.log('DEBUG: nginx proxy setup, input parameter', 'sslCrtLines', utils.inspect(sslCrtLines))
-  console.log('DEBUG: nginx proxy setup, input parameter', 'sslKeyLines', utils.inspect(sslKeyLines))
-  
   return {
     res: res,
     key: proxy.sslKey,
