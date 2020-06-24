@@ -81,7 +81,14 @@ export const defaultNginxConfig: NginxConfig = {
   tcp_nopush: 'off',
   keepalive_timeout: 65,
   gzip: 'on',
-  servers: '/etc/nginx/conf.d/*.conf'
+  servers: '/etc/nginx/conf.d'
+}
+
+const getServerConfDir = (configServer: string) => {
+  if (!configServer) return ''
+  if (configServer.length > 6 && configServer.substr(configServer.length-6) === '*.conf') {
+    return configServer.substr(0, configServer.length - 6)
+  } else return `${configServer}/`.replace(/\/\//g, '/')
 }
 
 const generateNginxConfigFile = async (
@@ -145,6 +152,7 @@ export class NginxReverseProxy {
     this.nginxConfigFilePath = nginxConfigFilePath
     this.nginxConfigDir = nginxConfigDir
     this.nginxConfig = Object.assign({}, defaultNginxConfig, nginxConfigSettings)
+    this.nginxConfig.servers = getServerConfDir(this.nginxConfig.servers!)
     if (sslCrtLines && sslCrtLines.length) {
       this.sslCrt = sslCrtLines.join('\n')
     } else {
