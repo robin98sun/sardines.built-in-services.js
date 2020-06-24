@@ -96,9 +96,11 @@ const generateNginxConfigFile = async (
   const sslCrtFilePath: string = path.resolve(config.servers!, './common.crt')
   const sslKeyFilePath: string = path.resolve(config.servers!, './common.key')
   if (sslCrt) {
+    console.log('writing SSL certification into file',sslCrtFilePath)
     fs.writeFileSync(sslCrtFilePath, sslCrt, {encoding: 'utf8'})
   }
   if (sslKey) {
+    console.log('writing SSL certification key into file',sslKeyFilePath)
     fs.writeFileSync(sslKeyFilePath, sslKey, {encoding: 'utf8'})
   }
   let content: string = `
