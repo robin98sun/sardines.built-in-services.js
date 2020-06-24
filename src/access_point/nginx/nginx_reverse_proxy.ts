@@ -9,7 +9,7 @@
 
 import { exec } from 'child_process'
 import * as fs from 'fs'
-// import * as path from 'path'
+import * as path from 'path'
 // import { Http } from 'sardines-core'
 
 const execCmd = async (cmd: string) => {
@@ -84,10 +84,22 @@ export const defaultNginxConfig: NginxConfig = {
   servers: '/etc/nginx/conf.d/*.conf'
 }
 
-const generateNginxConfigFile = async (configFilePath: string = '/etc/nginx/nginx.conf', configSettings: NginxConfig = defaultNginxConfig) => {
+const generateNginxConfigFile = async (
+  configFilePath: string = '/etc/nginx/nginx.conf', 
+  configSettings: NginxConfig = defaultNginxConfig,
+  sslCrt: string = '',
+  sslKey: string = '') => {
   const config: NginxConfig = Object.assign({}, defaultNginxConfig, configSettings)
   if (!fs.existsSync(configFilePath)) {
     throw `Can not access nginx config file [${configFilePath}]`
+  }
+  const sslCrtFilePath: string = path.resolve(config.servers!, './common.crt')
+  const sslKeyFilePath: string = path.resolve(config.servers!, './common.key')
+  if (sslCrt) {
+    fs.writeFileSync(sslCrtFilePath, sslCrt, {encoding: 'utf8'})
+  }
+  if (sslKey) {
+    fs.writeFileSync(sslKeyFilePath, sslKey, {encoding: 'utf8'})
   }
   let content: string = `
     user ${config.user};
@@ -98,6 +110,8 @@ const generateNginxConfigFile = async (configFilePath: string = '/etc/nginx/ngin
       worker_connections ${config.worker_connections};
     }
     http {
+      ${sslCrt ? 'ssl_certificate ' + sslCrtFilePath + ';' : ''}
+      ${sslKey ? 'ssl_certificate_key ' + sslKeyFilePath + ';' : ''}
       include ${config.types};
       default_type ${config.default_type};
       log_format main ${config.log_format!.join('\n\t\t')};
@@ -159,7 +173,7 @@ export class NginxReverseProxy {
     await execCmd('/usr/sbin/service nginx stop')
     // generate the config file using the initialization parameters
     if (option.initalizeConfigFile) {
-      await generateNginxConfigFile(this.nginxConfigFilePath, this.nginxConfig)
+      await generateNginxConfigFile(this.nginxConfigFilePath, this.nginxConfig, this.sslCrt, this.sslKey)
     }
     
     // restart nginx service
