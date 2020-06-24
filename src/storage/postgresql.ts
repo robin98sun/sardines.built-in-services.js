@@ -500,7 +500,7 @@ export class Database extends StorageBase {
                 result = result[distinct[0]]
             }
         }
-        // console.log(`result of query [${SQL}]:`, result)
+        console.log(`result of query [${SQL}]:`, result)
         return result
     }
 
