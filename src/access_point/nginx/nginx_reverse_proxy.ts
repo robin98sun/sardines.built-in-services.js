@@ -57,7 +57,7 @@ export interface NginxConfig {
   types?: string
   tcp_nopush?: string
   gzip?: string
-  servers?: string
+  serversDir?: string
   error_log?: string
   access_log?: string
   log_format?: string[]
@@ -81,14 +81,18 @@ export const defaultNginxConfig: NginxConfig = {
   tcp_nopush: 'off',
   keepalive_timeout: 65,
   gzip: 'on',
-  servers: '/etc/nginx/conf.d'
+  serversDir: '/etc/nginx/conf.d'
 }
 
 const getServerConfDir = (configServer: string) => {
   if (!configServer) return ''
-  if (configServer.length > 6 && configServer.substr(configServer.length-6) === '*.conf') {
-    return configServer.substr(0, configServer.length - 6)
-  } else return `${configServer}/`.replace(/\/\//g, '/')
+  if (configServer.length > 7 && configServer.substr(configServer.length-7) === '/*.conf') {
+    return configServer.substr(0, configServer.length - 7)
+  } else if (configServer[configServer.length - 1] === '/') {
+    return configServer.substr(0, configServer.length - 1)
+  } else {
+    return configServer
+  }
 }
 
 const generateNginxConfigFile = async (
@@ -100,8 +104,8 @@ const generateNginxConfigFile = async (
   if (!fs.existsSync(configFilePath)) {
     throw `Can not access nginx config file [${configFilePath}]`
   }
-  const sslCrtFilePath: string = path.resolve(config.servers!, './common.crt')
-  const sslKeyFilePath: string = path.resolve(config.servers!, './common.key')
+  const sslCrtFilePath: string = path.resolve(config.serversDir!, './common.crt')
+  const sslKeyFilePath: string = path.resolve(config.serversDir!, './common.key')
   if (sslCrt) {
     console.log('writing SSL certification into file',sslCrtFilePath)
     fs.writeFileSync(sslCrtFilePath, sslCrt, {encoding: 'utf8'})
@@ -128,7 +132,7 @@ const generateNginxConfigFile = async (
       sendfile ${config.sendfile};
       tcp_nopush ${config.tcp_nopush};
       gzip ${config.gzip};
-      include ${config.servers}/*.conf;
+      include ${config.serversDir}/*.conf;
     }
   `
   fs.writeFileSync(configFilePath, content, {encoding: 'utf8'})
@@ -152,7 +156,7 @@ export class NginxReverseProxy {
     this.nginxConfigFilePath = nginxConfigFilePath
     this.nginxConfigDir = nginxConfigDir
     this.nginxConfig = Object.assign({}, defaultNginxConfig, nginxConfigSettings)
-    this.nginxConfig.servers = getServerConfDir(this.nginxConfig.servers!)
+    this.nginxConfig.serversDir = getServerConfDir(this.nginxConfig.serversDir!)
     if (sslCrtLines && sslCrtLines.length) {
       this.sslCrt = sslCrtLines.join('\n')
     } else {

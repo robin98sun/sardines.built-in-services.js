@@ -26,7 +26,7 @@ export interface NginxConfig {
     types?: string;
     tcp_nopush?: string;
     gzip?: string;
-    servers?: string;
+    serversDir?: string;
     error_log?: string;
     access_log?: string;
     log_format?: string[];
