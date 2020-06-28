@@ -3,19 +3,25 @@ import * as path from 'path'
 import { utils } from 'sardines-core'
 
 
-import { NginxReverseProxy, NginxConfig } from './nginx_reverse_proxy'
+import { 
+  NginxReverseProxy, 
+  NginxConfig
+} from './nginx_reverse_proxy'
+
+export {
+  NginxReverseProxySupportedProtocol, 
+  NginxReverseProxyServiceRuntimeOptions,
+  NginxReverseProxyAccessPoint
+} from './nginx_reverse_proxy'
 
 
 let proxy: NginxReverseProxy|null = null
 
 export const setup = async (
   nginxConfig: NginxConfig,
-  nginxConfigFilePath:string = '/etc/nginx/nginx.conf', 
-  nginxConfigDir: string = '/etc/nginx/conf.d/',
-  sslCrtLines: string[],
-  sslKeyLines: string[],
+  nginxConfigFilePath:string = '/etc/nginx/nginx.conf'
 ) => {
-  proxy = new NginxReverseProxy(nginxConfig, nginxConfigFilePath, nginxConfigDir, sslCrtLines, sslKeyLines)
+  proxy = new NginxReverseProxy(nginxConfig, nginxConfigFilePath)
   let res = null
   try {
     res = await proxy.start({initalizeConfigFile: true})
@@ -27,9 +33,4 @@ export const setup = async (
     res: res,
     timestamp: Date.now()
   }
-}
-
-export const execCmd = async(cmd:string) => {
-  if (!proxy) return null
-  else return await proxy.exec(cmd)
 }
