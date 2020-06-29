@@ -14,7 +14,7 @@ import { Sardines, utils } from 'sardines-core'
 
 import { AccessPoint, AccessPointServiceRuntimeOptions } from '../base'
 
-const execCmd = async (cmd: string) => {
+export const execCmd = async (cmd: string) => {
   return new Promise((res, rej) => {
     exec(cmd, (error, stdout, stderr) => {
       if (error) {
@@ -121,21 +121,6 @@ export interface NginxReverseProxyUpstreamCache {
   [upstreamName: string]: NginxReverseProxyUpstreamCacheItem
 }
 
-export interface NginxReverseProxyRouteTable {
-  [accessPointKey: string]: {
-    [path: string]: NginxReverseProxyUpstreamCacheItem
-  }
-}
-
-export interface NginxReverseProxyUpstreamReverseCache {
-  [server: string]: {
-    [upstreamName: string]: {
-      weight: number
-      protocol?: NginxReverseProxySupportedProtocol
-      loadBalancing?: Sardines.Runtime.LoadBalancingStrategy
-    }
-  }
-}
 
 export interface NginxServerInterface {
   addr?: string
@@ -151,14 +136,44 @@ export interface NginxServer {
   [key:string]: any
 }
 
+export interface NginxReverseProxyServerCache {
+  [nginxServerKey: string]: {
+    options: NginxServer
+    locations: {
+      [path: string]: NginxReverseProxyUpstreamCacheItem
+    }
+  }
+}
+
+export interface NginxReverseProxyUpstreamReverseCache {
+  [server: string]: {
+    [upstreamName: string]: {
+      weight: number
+      protocol?: NginxReverseProxySupportedProtocol
+      loadBalancing?: Sardines.Runtime.LoadBalancingStrategy
+    }
+  }
+}
+
+export interface NginxReverseProxyRouteTable {
+  upstreams: {
+    upstreamCache: NginxReverseProxyUpstreamCache,
+    reverseUpstreamCache: NginxReverseProxyUpstreamReverseCache
+  },
+  servers: NginxReverseProxyServerCache
+}
+
 const keyOfNginxServer = (vap: NginxServer): string =>{
   let key = ''
   if (vap.interfaces && vap.interfaces.length) {
-    key += '@' + vap.interfaces.map((i:NginxServerInterface) => `${i.addr||'0.0.0.0'}:${i.port||80}:${i.ssl||false}`)
+    key += '@' + vap.interfaces.map((i:NginxServerInterface) => (
+      `${i.addr||'0.0.0.0'}:${i.port||80}:${i.ssl?'ssl':'non-ssl'}`
+    ))
     .sort((a,b)=>(a<b)?1:-1).join(',')
     
   }
   if (vap.name) key += '@' + vap.name
+
   return key
 } 
 
@@ -249,11 +264,8 @@ const parseUpstreams = (content: string): {upstreamCache: NginxReverseProxyUpstr
   return result
 }
 
-const parseServers = (content: string, 
-                      upstreamCache: NginxReverseProxyUpstreamCache, 
-                      reverseUpstreamCache: NginxReverseProxyUpstreamReverseCache
-                     ): any => {
-  const result = []
+const parseServers = (content: string, upstreamCache: NginxReverseProxyUpstreamCache): NginxReverseProxyServerCache => {
+  const result: NginxReverseProxyServerCache = {}
   // let matches = content.match(/server[\s]+{[^}]+(location[\s]+[\S]+[\s]+{[^}]+}[\n|\s]+)+[\s|\n]*}/gmi)
   const locationBlockRegexStr = 'location[\\s]+[\\S]+[\\s]+{[^}]+}[\\n|\\s]*'
   const serverBlockRegexStr = `server[\\s]+{[^}]+(${locationBlockRegexStr})+[\\s|\\n]*}`
@@ -271,7 +283,7 @@ const parseServers = (content: string,
                                   name: i[0].toLowerCase(),
                                   values: i.slice(1)
                                 }))
-    const serverOptions: NginxServerConfig = {}
+    const serverOptions: NginxServer = {}
     for (let option of serverOptionList) {
       if (option.name === 'listen') {
         const interfaceAndPort = option.values[0]
@@ -297,6 +309,22 @@ const parseServers = (content: string,
       }
     }
 
+    const serverKey = keyOfNginxServer(serverOptions)
+    // ignore duplicated servers
+    if (result[serverKey]) continue
+    // by default, 80 is only used for http, and 443 is only used for https
+    let valid = true
+    if (serverOptions.interfaces && serverOptions.interfaces.length) {
+      for (let inf of serverOptions.interfaces) {
+        if (inf.port === 80 && inf.ssl) valid = false
+        else if (inf.port === 443 && !inf.ssl) valid = false
+        if (!valid) break
+      }
+    }
+    if (!valid) continue
+    // ignore localhost server_name
+    if (serverOptions.name && serverOptions.name.toLowerCase() === 'localhost') continue
+
     // parse server locations
     const locationMatches = serverBlock.match(new RegExp(locationBlockRegexStr, 'gmi'))
     if (!locationMatches || !locationMatches.length) continue
@@ -306,6 +334,9 @@ const parseServers = (content: string,
     }
     for (let locationBlockStr of locationMatches) {
       const locationPath = locationBlockStr.replace(/location[\s]+([\S]+)[\s]+{[^}]+}[\n|\s]*/gmi, '$1')
+      // ignore duplicated path
+      if (server.locations[locationPath]) continue
+      // parse location block
       const locationBlock = locationBlockStr.replace(/location[\s]+[\S]+[\s]+{([^}]+)}[\n|\s]*/gmi, '$1')
                                 .trim().replace(/(.+);/g, '$1').split(/[\s]+/g)
       if (locationBlock.length >= 2 && locationBlock[0] === 'proxy_pass') {
@@ -314,37 +345,121 @@ const parseServers = (content: string,
         if (parts.length !== 2) continue
         const protocol = parts[0].toLowerCase()
         const upstreamName = parts[1]
-        if (!server.locations[locationPath]) {
-          server.locations[locationPath] = {
-            upstreamName,
-            protocol
-          }
+        // ignore nonsense upstreams
+        if (!upstreamCache[upstreamName]) continue
+        // validate upstream's protocol
+        const upstreamObj = upstreamCache[upstreamName]
+        if (upstreamObj.protocol && upstreamObj.protocol.toLowerCase() !== protocol ) continue
+        // update upstream's protocol if it's empty
+        if (!upstreamObj.protocol) {
+          upstreamObj.protocol = <NginxReverseProxySupportedProtocol>(protocol as keyof typeof NginxReverseProxySupportedProtocol)
+        }
+        // save upstream
+        server.locations[locationPath] = {
+          upstreamName,
+          protocol
         }
       }
     }
-    result.push(server)
+    // save valid server
+    result[serverKey] = server
   }
   return result
 }
 
-export const readRouteTable = async(routeTableFilePath: string): Promise<any> => {
+export const readRouteTable = async(routeTableFilePath: string): Promise<NginxReverseProxyRouteTable> => {
   if (!routeTableFilePath || !fs.existsSync(routeTableFilePath)) {
-    return {}
+    throw `nginx sever config file does not exist at [${routeTableFilePath}]`
   }
   
-  const content = fs.readFileSync(routeTableFilePath, {encoding: 'utf8'})
-                    .toString().replace(/#[^\n]*/gm, '')
+  try {
+    const content = fs.readFileSync(routeTableFilePath, {encoding: 'utf8'})
+    .toString().replace(/#[^\n]*/gm, '')
 
-  // search upstream apps
-  const upstreams = parseUpstreams(content)
+    // search upstream apps
+    const upstreams = parseUpstreams(content)
 
-  // search servers
-  const servers = parseServers(content, upstreams.upstreamCache, upstreams.reverseUpstreamCache)
-  return {upstreams, servers}
+    // search servers
+    const servers = parseServers(content, upstreams.upstreamCache)
+    const result:NginxReverseProxyRouteTable = {upstreams, servers}
+    return result
+  } catch(e) {
+    throw `unexpected error when reading nginx server config file at [${routeTableFilePath}]: ${e}`
+  }
 }
 
 export const writeRouteTable = async(routeTableFilePath: string, routetable: NginxReverseProxyRouteTable) => {
+  if (!routetable) {
+    throw `error when writing nginx server config file: empty routetable object`
+  }
 
+  if (!routetable.servers || !routetable.upstreams || !routetable.upstreams.upstreamCache) {
+    throw `error when writing nginx server config file: invalid routable object`
+  }
+
+  try {
+    // write upstreams
+    fs.writeFileSync(routeTableFilePath, `# sardines access points`)
+    const appendline = (line: string) => {
+      fs.writeFileSync(routeTableFilePath, line + '\n', {flag: 'a'})
+    }
+    appendline(`# updated at ${new Date()}`)
+    for (let upstreamKey of Object.keys(routetable.upstreams.upstreamCache)) {
+      const upstreamObj = routetable.upstreams.upstreamCache[upstreamKey]
+      appendline(`upstream ${upstreamObj.upstreamName} {`)
+      if (upstreamObj.loadBalancing === Sardines.Runtime.LoadBalancingStrategy.evenWorkload) {
+        appendline(`    least_conn;`)
+      } else if (upstreamObj.loadBalancing === Sardines.Runtime.LoadBalancingStrategy.workloadFocusing) {
+        appendline(`    ip_hash;`)
+      }
+      for (let source of upstreamObj.items) {
+        appendline(`    server ${source.server}${source.weight?' weight='+source.weight:''};`)
+      }
+      appendline(`}\n`)
+    }
+    // write servers
+    for (let serverKey of Object.keys(routetable.servers)) {
+      const serverObj = routetable.servers[serverKey]
+      if (!serverObj.options) continue
+      appendline('server {')
+      // write server options
+      const topProps = ['interfaces', 'name']
+      if (serverObj.options.interfaces) {
+        for (let inf of serverObj.options.interfaces) {
+          if (!inf || !inf.port) continue
+          appendline(`    listen ${inf.addr?inf.addr+':':''}${inf.port}${inf.ssl?' ssl':''};`)
+        }
+      }
+      if (serverObj.options.name) {
+        appendline(`    server_name ${serverObj.options.name};`)
+      }
+      for (let key of Object.keys(serverObj.options)) {
+        if (topProps.indexOf(key)>=0) continue
+        appendline(`    ${key} ${serverObj.options[key]};`)
+      }
+      // write locations
+      let locationList = Object.keys(serverObj.locations)
+      locationList.sort((a,b) => {
+        if (!a && !b) return 0
+        else if (!a) return -1
+        else if (!b) return 1
+        else if (a === b) return 0
+        else if (a.length !== b.length) return b.length - a.length
+        else if (a < b) return 1
+        else if (a > b) return -1
+        return 0
+      })
+      for (let location of locationList) {
+        const locationObj = serverObj.locations[location]
+        appendline(`\n    location ${location} {`)
+        appendline(`        proxy_pass ${locationObj.protocol}://${locationObj.upstreamName};`)
+        appendline(`    }`)
+      }
+      appendline(`}\n`)
+    }
+  } catch (e) {
+    throw `unexpected error when writing nginx server config file at [${routeTableFilePath}]: ${e}`
+  }
 }
 
 export class NginxReverseProxy extends AccessPoint{
@@ -398,11 +513,11 @@ export class NginxReverseProxy extends AccessPoint{
     }
   }
 
-  public async registerAccessPoint(options: NginxReverseProxyAccessPoint) {
+  public async registerAccessPoint(options: NginxServer) {
 
   }
 
-  public async removeAccessPoint(options: NginxReverseProxyAccessPoint) {
+  public async removeAccessPoint(options: NginxServer) {
 
   }
 
