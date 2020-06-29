@@ -3,12 +3,31 @@ import { expect } from 'chai'
 import { 
   readRouteTable,
   writeRouteTable,
-  execCmd
+  NginxReverseProxy,
+  NginxConfig,
+  NginxServer
 } from '../../../src/access_point/nginx/nginx_reverse_proxy'
 import {utils} from 'sardines-core'
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { exec } from 'child_process'
+
+export const execCmd = async (cmd: string) => {
+  return new Promise((res, rej) => {
+    exec(cmd, (error, stdout, stderr) => {
+      if (error) {
+        const errMsg = `error while executing shell command [${cmd}]: ${error.message}; stdout: ${stdout}, stderr: ${stderr}`
+        rej(errMsg);
+      }
+      if (stderr) {
+        const errMsg = `stderr output of shell command [${cmd}]: ${stderr}`
+        rej(errMsg)
+      }
+      res(stdout)
+    });
+  })
+}
 
 const routetable_filepath = path.resolve('./test/conf/nginx_sardines_server.conf')
 const tmp_routetable_filepath = path.resolve('./test/tmp_nginx_sardines_server.conf')
@@ -67,5 +86,64 @@ describe('[nginx] routetable', () => {
     expect(utils.isEqual(routetable, newRouteTable)).to.be.true
     await execCmd(`rm -f ${tmp_routetable_filepath}`)
     expect(fs.existsSync(tmp_routetable_filepath)).to.be.false
+  })
+
+  it('should register access points', async() => {
+    const routetable = await readRouteTable(routetable_filepath)
+    await writeRouteTable(tmp_routetable_filepath, routetable)
+
+    const nginxConfig: NginxConfig = {}
+    nginxConfig.serversDir = path.resolve('./test/')
+    nginxConfig.sardinesServersFileName = 'tmp_nginx_sardines_server.conf'
+
+    const proxy = new NginxReverseProxy(nginxConfig)
+    try {
+      await proxy.registerAccessPoints([], {restart: false, returnRouteTable: false})
+    } catch (e) {
+      expect(e).to.equal('empty options')
+    }
+
+    // duplicated server
+    let result = await proxy.registerAccessPoints([{
+        interfaces: [ { port: 80, ssl: false } ],
+        name: 'www.example.com'
+      }], {restart: false, returnRouteTable: false})
+    expect(result).to.be.instanceOf(Array)
+    expect((<NginxServer[]>result).length).to.equal(0)
+
+    // invalid server 
+    result = await proxy.registerAccessPoints([{
+      interfaces: [ { port: 80, ssl: true } ],
+      name: 'www.example.com'
+    }], {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true})
+    expect(result).to.be.instanceOf(Array)
+    expect((<NginxServer[]>result).length).to.equal(0)
+
+    // valid server
+    let testApList = [{
+      interfaces: [ { port: 8080, ssl: true } ],
+      name: 'www.example.com'
+    }, {
+      interfaces: [ { port: 443, ssl: true } ],
+      name: 'www.example.org'
+    }, {
+      interfaces: [ { port: 80, ssl: false } ],
+      name: 'www.example.net'
+    }]
+    result = await proxy.registerAccessPoints(testApList, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true})
+    expect(result).to.be.instanceOf(Array)
+    expect((<NginxServer[]>result).length).to.equal(3)
+    expect(utils.isEqual(result, testApList)).to.be.true
+
+    // invalid server
+    const tmplist = [...testApList]
+    tmplist.push({
+      interfaces: [ { port: 80, ssl: false } ],
+      name: 'localhost'
+    })
+    result = await proxy.registerAccessPoints(tmplist, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true})
+    expect(result).to.be.instanceOf(Array)
+    expect((<NginxServer[]>result).length).to.equal(0)    
+    await execCmd(`rm -f ${tmp_routetable_filepath}`)
   })
 })

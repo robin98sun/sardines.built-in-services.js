@@ -14,7 +14,7 @@ import { Sardines, utils } from 'sardines-core'
 
 import { AccessPoint, AccessPointServiceRuntimeOptions } from '../base'
 
-export const execCmd = async (cmd: string) => {
+const execCmd = async (cmd: string) => {
   return new Promise((res, rej) => {
     exec(cmd, (error, stdout, stderr) => {
       if (error) {
@@ -30,6 +30,22 @@ export const execCmd = async (cmd: string) => {
   })
 }
 
+const stopNginx = async() => {
+  await execCmd('/usr/sbin/service nginx stop')
+}
+const startNginx = async() => {
+  await execCmd(`/usr/sbin/service nginx start`)
+}
+const isNginxRunning = async() => {
+  let restartResult: any = ''
+  restartResult = await execCmd('/usr/sbin/service nginx status')
+  if (restartResult === 'nginx is running.\n') {
+    this.isRunning = true
+    return true
+  }
+  return false
+}
+
 export interface NginxConfig {
   user?: string
   worker_processes?: number
@@ -42,6 +58,7 @@ export interface NginxConfig {
   tcp_nopush?: string
   gzip?: string
   serversDir?: string
+  sardinesServersFileName?: string
   error_log?: string
   access_log?: string
   log_format?: string[]
@@ -68,6 +85,7 @@ export const defaultNginxConfig: NginxConfig = {
   keepalive_timeout: 65,
   gzip: 'on',
   serversDir: '/etc/nginx/conf.d',
+  sardinesServersFileName: 'sardines_servers.conf',
   ssl_session_cache: 'shared:SSL:10m',
   ssl_session_timeout: '10m'
 }
@@ -165,15 +183,13 @@ export interface NginxReverseProxyRouteTable {
 
 const keyOfNginxServer = (vap: NginxServer): string =>{
   let key = ''
-  if (vap.interfaces && vap.interfaces.length) {
-    key += '@' + vap.interfaces.map((i:NginxServerInterface) => (
-      `${i.addr||'0.0.0.0'}:${i.port||80}:${i.ssl?'ssl':'non-ssl'}`
-    ))
-    .sort((a,b)=>(a<b)?1:-1).join(',')
-    
-  }
-  if (vap.name) key += '@' + vap.name
-
+  if (!vap.interfaces || !vap.interfaces.length || !vap.name) return key
+  key += '@' + vap.interfaces.map((i:NginxServerInterface) => (
+    `${i.addr||'0.0.0.0'}:${i.port||80}:${i.ssl?'ssl':'non-ssl'}`
+  ))
+  .filter((i:string)=>i.length).sort((a,b)=>(a<b)?1:-1).join(',')
+  if (key === '@') return ''
+  key += '@' + vap.name
   return key
 } 
 
@@ -268,7 +284,7 @@ const parseServers = (content: string, upstreamCache: NginxReverseProxyUpstreamC
   const result: NginxReverseProxyServerCache = {}
   // let matches = content.match(/server[\s]+{[^}]+(location[\s]+[\S]+[\s]+{[^}]+}[\n|\s]+)+[\s|\n]*}/gmi)
   const locationBlockRegexStr = 'location[\\s]+[\\S]+[\\s]+{[^}]+}[\\n|\\s]*'
-  const serverBlockRegexStr = `server[\\s]+{[^}]+(${locationBlockRegexStr})+[\\s|\\n]*}`
+  const serverBlockRegexStr = `(server[\\s]+{[^}]+(${locationBlockRegexStr})+[\\s|\\n]*})|(server[\\s]+{[^}]+})`
   let matches = content.match(new RegExp(serverBlockRegexStr, 'gmi'))
   if (!matches || !matches.length) return result
   for (let serverBlockStr of matches) {
@@ -326,38 +342,39 @@ const parseServers = (content: string, upstreamCache: NginxReverseProxyUpstreamC
     if (serverOptions.name && serverOptions.name.toLowerCase() === 'localhost') continue
 
     // parse server locations
-    const locationMatches = serverBlock.match(new RegExp(locationBlockRegexStr, 'gmi'))
-    if (!locationMatches || !locationMatches.length) continue
     const server = {
       options: serverOptions,
       locations: {}
     }
-    for (let locationBlockStr of locationMatches) {
-      const locationPath = locationBlockStr.replace(/location[\s]+([\S]+)[\s]+{[^}]+}[\n|\s]*/gmi, '$1')
-      // ignore duplicated path
-      if (server.locations[locationPath]) continue
-      // parse location block
-      const locationBlock = locationBlockStr.replace(/location[\s]+[\S]+[\s]+{([^}]+)}[\n|\s]*/gmi, '$1')
-                                .trim().replace(/(.+);/g, '$1').split(/[\s]+/g)
-      if (locationBlock.length >= 2 && locationBlock[0] === 'proxy_pass') {
-        // parse upstream name
-        const parts = locationBlock[1].split('://')
-        if (parts.length !== 2) continue
-        const protocol = parts[0].toLowerCase()
-        const upstreamName = parts[1]
-        // ignore nonsense upstreams
-        if (!upstreamCache[upstreamName]) continue
-        // validate upstream's protocol
-        const upstreamObj = upstreamCache[upstreamName]
-        if (upstreamObj.protocol && upstreamObj.protocol.toLowerCase() !== protocol ) continue
-        // update upstream's protocol if it's empty
-        if (!upstreamObj.protocol) {
-          upstreamObj.protocol = <NginxReverseProxySupportedProtocol>(protocol as keyof typeof NginxReverseProxySupportedProtocol)
-        }
-        // save upstream
-        server.locations[locationPath] = {
-          upstreamName,
-          protocol
+    const locationMatches = serverBlock.match(new RegExp(locationBlockRegexStr, 'gmi'))
+    if (locationMatches && locationMatches.length) {
+      for (let locationBlockStr of locationMatches) {
+        const locationPath = locationBlockStr.replace(/location[\s]+([\S]+)[\s]+{[^}]+}[\n|\s]*/gmi, '$1')
+        // ignore duplicated path
+        if (server.locations[locationPath]) continue
+        // parse location block
+        const locationBlock = locationBlockStr.replace(/location[\s]+[\S]+[\s]+{([^}]+)}[\n|\s]*/gmi, '$1')
+                                  .trim().replace(/(.+);/g, '$1').split(/[\s]+/g)
+        if (locationBlock.length >= 2 && locationBlock[0] === 'proxy_pass') {
+          // parse upstream name
+          const parts = locationBlock[1].split('://')
+          if (parts.length !== 2) continue
+          const protocol = parts[0].toLowerCase()
+          const upstreamName = parts[1]
+          // ignore nonsense upstreams
+          if (!upstreamCache[upstreamName]) continue
+          // validate upstream's protocol
+          const upstreamObj = upstreamCache[upstreamName]
+          if (upstreamObj.protocol && upstreamObj.protocol.toLowerCase() !== protocol ) continue
+          // update upstream's protocol if it's empty
+          if (!upstreamObj.protocol) {
+            upstreamObj.protocol = <NginxReverseProxySupportedProtocol>(protocol as keyof typeof NginxReverseProxySupportedProtocol)
+          }
+          // save upstream
+          server.locations[locationPath] = {
+            upstreamName,
+            protocol
+          }
         }
       }
     }
@@ -369,7 +386,7 @@ const parseServers = (content: string, upstreamCache: NginxReverseProxyUpstreamC
 
 export const readRouteTable = async(routeTableFilePath: string): Promise<NginxReverseProxyRouteTable> => {
   if (!routeTableFilePath || !fs.existsSync(routeTableFilePath)) {
-    throw `nginx sever config file does not exist at [${routeTableFilePath}]`
+    return {upstreams: {upstreamCache: {}, reverseUpstreamCache: {}}, servers: {}}
   }
   
   try {
@@ -427,7 +444,7 @@ export const writeRouteTable = async(routeTableFilePath: string, routetable: Ngi
       if (serverObj.options.interfaces) {
         for (let inf of serverObj.options.interfaces) {
           if (!inf || !inf.port) continue
-          appendline(`    listen ${inf.addr?inf.addr+':':''}${inf.port}${inf.ssl?' ssl':''};`)
+          appendline(`    listen ${inf.addr&& inf.addr!=='0.0.0.0'?inf.addr+':':''}${inf.port}${inf.ssl?' ssl':''};`)
         }
       }
       if (serverObj.options.name) {
@@ -462,10 +479,18 @@ export const writeRouteTable = async(routeTableFilePath: string, routetable: Ngi
   }
 }
 
+const updateRouteTableFile = async(routeTableFilePath: string, routable: NginxReverseProxyRouteTable) => {
+  await writeRouteTable(routeTableFilePath, routable)
+  const updatedRouteTable = await readRouteTable(routeTableFilePath)
+  await writeRouteTable(routeTableFilePath, updatedRouteTable)
+  return updatedRouteTable
+}
+
 export class NginxReverseProxy extends AccessPoint{
   private nginxConfigFilePath: string
   private nginxConfig: NginxConfig
   private routeTableFilePath: string
+  public isRunning: boolean
 
   constructor(
     nginxConfigSettings: NginxConfig = defaultNginxConfig,
@@ -475,7 +500,8 @@ export class NginxReverseProxy extends AccessPoint{
     this.nginxConfigFilePath = nginxConfigFilePath
     this.nginxConfig = Object.assign({}, defaultNginxConfig, nginxConfigSettings)
     this.nginxConfig.serversDir = getServerConfDir(this.nginxConfig.serversDir!)
-    this.routeTableFilePath = syspath.resolve(this.nginxConfig.serversDir!, './sardines_servers.conf')
+    this.routeTableFilePath = syspath.resolve(this.nginxConfig.serversDir!, `./${this.nginxConfig.sardinesServersFileName!}`)
+    this.isRunning = false
   }
 
   public async start(option: {initalizeConfigFile: boolean}) {    
@@ -491,15 +517,12 @@ export class NginxReverseProxy extends AccessPoint{
     
     // generate the config file using the initialization parameters
     if (option.initalizeConfigFile) {
-      await execCmd('/usr/sbin/service nginx stop')
+      await stopNginx()
       await generateNginxConfigFile(this.nginxConfigFilePath, this.nginxConfig)
-      await execCmd(`/usr/sbin/service nginx start`)
+      await startNginx()
     }
     
-    // restart nginx service
-    let restartResult: any = ''
-    restartResult = await execCmd('/usr/sbin/service nginx status')
-    if (restartResult === 'nginx is running.\n') {
+    if (await isNginxRunning()) {
       return true
     }
     throw `nginx is not started`
@@ -513,11 +536,73 @@ export class NginxReverseProxy extends AccessPoint{
     }
   }
 
-  public async registerAccessPoint(options: NginxServer) {
+  public async registerAccessPoints(accessPointList: NginxServer[], options: {restart?: boolean, returnRouteTable?: boolean, writeServerConfigFileWithoutRestart?: boolean} = {restart: true, returnRouteTable: false, writeServerConfigFileWithoutRestart: false}) {
+    if (!accessPointList || !accessPointList.length) throw `empty options`
+    if (!Array.isArray(accessPointList)) throw `invalid options`
+    let routetable = await readRouteTable(this.routeTableFilePath)
+    const registered: NginxServer[] = []
+    for (let accessPointOptions of accessPointList) {
+      if (!accessPointOptions) continue
+      const key = keyOfNginxServer(accessPointOptions)
+      if (!key) continue
+      if (routetable.servers[key]) continue
+      // write ssl files if needed
+      try {
+        for (let sslProp of ['ssl_certificate','ssl_certificate_key']) {
+          if (accessPointOptions[sslProp]) {
+            if (Array.isArray(accessPointOptions[sslProp]) || accessPointOptions[sslProp].length > 500) {
+              // write content to file
+              const content = Array.isArray(accessPointOptions[sslProp])
+                                ? accessPointOptions[sslProp].join('\n')
+                                : accessPointOptions[sslProp]
+              const filename = `${accessPointOptions.name}.${sslProp==='ssl_certificate'?'crt':'key'}`
+              const filepath = syspath.resolve(`${this.nginxConfig.serversDir}/`, `./${filename}`)
+              fs.writeFileSync(filepath, content)
+              // change the prop value from content to filename
+              accessPointOptions[sslProp] = filename
+            } else {
+              if (!fs.existsSync(syspath.resolve(`${this.nginxConfig.serversDir}/`, accessPointOptions[sslProp]))) {
+                throw `${sslProp} file [${accessPointOptions[sslProp]}] does not exist`
+              }
+            }
+          }
 
+        }
+      } catch (e) {
+        console.log(`Error while writing ssl files:`, e)
+        continue
+      }
+      // remove conflicting options
+      for (let prop of ['location', 'locations']) {
+        if (accessPointOptions[prop]) delete accessPointOptions[prop]
+      }
+      // write to route table
+      routetable.servers[key]= {options: accessPointOptions, locations: {}}
+      registered.push(accessPointOptions)
+    }
+    if (registered.length && !(options && !options.restart)) {
+      this.isRunning = false
+      await stopNginx()
+      routetable = await updateRouteTableFile(this.routeTableFilePath, routetable)
+      await startNginx()
+      if (await isNginxRunning()) {
+        this.isRunning = true
+      }
+    } else if (registered.length && options && options.writeServerConfigFileWithoutRestart) {
+      routetable = await updateRouteTableFile(this.routeTableFilePath, routetable)
+    }
+
+    if (options && options.returnRouteTable) {
+      return routetable
+    } else {
+      return registered.filter((i:NginxServer) => {
+        const key = keyOfNginxServer(i)
+        return (key && typeof routetable.servers[key] !== 'undefined')
+      })
+    }
   }
 
-  public async removeAccessPoint(options: NginxServer) {
+  public async removeAccessPoints(options: NginxServer[]) {
 
   }
 
