@@ -5,7 +5,9 @@ import {
   writeRouteTable,
   NginxReverseProxy,
   NginxConfig,
-  NginxServer
+  NginxServer,
+  keyOfNginxServer,
+  NginxReverseProxyRouteTable
 } from '../../../src/access_point/nginx/nginx_reverse_proxy'
 import {utils} from 'sardines-core'
 
@@ -39,6 +41,7 @@ describe('[nginx] routetable', () => {
     expect(routetable).to.be.an.instanceof(Object)
     expect(routetable).to.has.property('upstreams')
     expect(routetable.upstreams).to.has.property('upstreamCache')
+    expect(Object.keys(routetable.upstreams.upstreamCache).length).to.eq(4)
     expect(routetable.upstreams).to.has.property('reverseUpstreamCache')
     expect(routetable.upstreams.upstreamCache).to.has.property('myApp_HTTPS')
     expect(routetable.upstreams.upstreamCache['myApp_HTTPS']).to.has.property('protocol', 'https')
@@ -53,28 +56,44 @@ describe('[nginx] routetable', () => {
     expect(routetable.upstreams.upstreamCache['myApp1'].items[0]).to.has.property('weight', 3)
     expect(routetable.upstreams.upstreamCache['myApp1'].items[0]).to.has.property('server', 'srv1.example.com')
     expect(routetable).to.has.property('servers')
-    expect(Object.keys(routetable.servers).length).to.equal(3)
-    expect(routetable.servers).to.have.property('@0.0.0.0:80:non-ssl@www.example.com')
-    expect(routetable.servers).to.have.property('@172.20.20.200:443:ssl@inner.https.example.com')
-    expect(routetable.servers).to.have.property('@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com')
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'])
+    expect(routetable.servers).to.has.property('serverCache')
+    expect(Object.keys(routetable.servers.serverCache).length).to.equal(4)
+    expect(routetable.servers.serverCache).to.have.property('@0.0.0.0:80:non-ssl@www.onlyone.com')
+    expect(routetable.servers.serverCache).to.have.property('@0.0.0.0:80:non-ssl@www.example.com')
+    expect(routetable.servers.serverCache).to.have.property('@172.20.20.200:443:ssl@inner.https.example.com')
+    expect(routetable.servers.serverCache).to.have.property('@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com')
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'])
     .to.have.property('options')
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
     .to.have.property('interfaces')
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options.interfaces)
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options.interfaces)
     .to.be.instanceOf(Array)
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options.interfaces.length)
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options.interfaces.length)
     .to.equal(2)
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
     .to.have.property('name', 'https.example.com')
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
     .to.have.property('ssl_certificate', 'https.example.com.crt')
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].options)
     .to.have.property('ssl_certificate_key', 'https.example.com.key')
-    expect(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'])
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'])
     .to.have.property('locations')
-    expect(Object.keys(routetable.servers['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].locations).length)
+    expect(Object.keys(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].locations).length)
     .to.equal(3)
+    expect(routetable.servers).to.has.property('reverseServerCache')
+    expect(Object.keys(routetable.servers.reverseServerCache).length).to.equal(4)
+    expect(routetable.servers.reverseServerCache).to.have.property('myApp1')
+    expect(routetable.servers.reverseServerCache).to.have.property('myApp2')
+    expect(routetable.servers.reverseServerCache).to.have.property('myApp_HTTPS')
+    expect(Object.keys(routetable.servers.reverseServerCache['myApp_HTTPS']).length).to.equal(2)
+    expect(routetable.servers.reverseServerCache['myApp_HTTPS']).to.have.property('@172.20.20.200:443:ssl@inner.https.example.com')
+    expect(routetable.servers.reverseServerCache['myApp_HTTPS']).to.have.property('@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com')
+    expect(Object.keys(routetable.servers.reverseServerCache['myApp_HTTPS']['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com']).length).to.equal(2)
+    expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com']).to.has.property('locations')
+    expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com']).to.has.property('options')
+    expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@172.20.20.200:443:ssl@inner.https.example.com']).to.has.property('locations')
+    expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@172.20.20.200:443:ssl@inner.https.example.com'].locations.length).to.equal(1)
+    expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@172.20.20.200:443:ssl@inner.https.example.com'].locations[0]).to.equal('/myapp3_root')
   })
 
   it('should write routetable to file', async()=> {
@@ -100,9 +119,14 @@ describe('[nginx] routetable', () => {
     try {
       await proxy.registerAccessPoints([], {restart: false, returnRouteTable: false})
     } catch (e) {
-      expect(e).to.equal('empty options')
+      expect(e).to.equal('empty access point list')
     }
 
+    try {
+      await proxy.registerAccessPoints(<Array<NginxConfig>>{}, {restart: false, returnRouteTable: false})
+    } catch (e) {
+      expect(e).to.equal('invalid access point list')
+    }
     // duplicated server
     let result = await proxy.registerAccessPoints([{
         interfaces: [ { port: 80, ssl: false } ],
@@ -145,5 +169,64 @@ describe('[nginx] routetable', () => {
     expect(result).to.be.instanceOf(Array)
     expect((<NginxServer[]>result).length).to.equal(0)    
     await execCmd(`rm -f ${tmp_routetable_filepath}`)
+  })
+
+  it('should remove access points', async() => {
+    let routetable = await readRouteTable(routetable_filepath)
+    await writeRouteTable(tmp_routetable_filepath, routetable)
+
+    const nginxConfig: NginxConfig = {}
+    nginxConfig.serversDir = path.resolve('./test/')
+    nginxConfig.sardinesServersFileName = 'tmp_nginx_sardines_server.conf'
+
+    const proxy = new NginxReverseProxy(nginxConfig)
+    try {
+      await proxy.removeAccessPoints([], {restart: false, returnRouteTable: false})
+    } catch (e) {
+      expect(e).to.equal('empty access point list')
+    }
+
+    try {
+      await proxy.registerAccessPoints(<Array<NginxConfig>>{}, {restart: false, returnRouteTable: false})
+    } catch (e) {
+      expect(e).to.equal('invalid access point list')
+    }
+    // servers do not exist
+    let testApList = [{
+      interfaces: [ { port: 8080, ssl: true } ],
+      name: 'www.example.com'
+    }, {
+      interfaces: [ { port: 443, ssl: true } ],
+      name: 'www.example.org'
+    }, {
+      interfaces: [ { port: 80, ssl: false } ],
+      name: 'www.example.net'
+    }]
+    let result = await proxy.removeAccessPoints(testApList, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true})
+    expect(result).to.be.instanceOf(Array)
+    expect((<NginxServer[]>result).length).to.equal(0)
+    // valid server
+    testApList = [{
+      interfaces: [ { port: 80, ssl: false } ],
+      name: 'www.example.com'
+    }]
+    result = await proxy.removeAccessPoints(testApList, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true})
+    expect(result).to.be.instanceOf(Array)
+    expect((<NginxServer[]>result).length).to.equal(1)
+    expect(utils.isEqual(testApList, result)).to.be.true
+
+    // valid server
+    routetable = await readRouteTable(tmp_routetable_filepath)
+    expect(routetable.upstreams.upstreamCache).has.property('myApp_onlyone')
+    testApList = [{
+      interfaces: [ { port: 80, ssl: false } ],
+      name: 'www.onlyone.com'
+    }]
+    const key = keyOfNginxServer(testApList[0])
+    result = await proxy.removeAccessPoints(testApList, {restart: false, returnRouteTable: true, writeServerConfigFileWithoutRestart: true})
+    expect(result).to.be.instanceOf(Object)
+    expect((<NginxReverseProxyRouteTable>result).servers.serverCache[key]).to.be.undefined
+    expect((<NginxReverseProxyRouteTable>result).upstreams.upstreamCache['myApp_onlyone']).to.be.undefined
+    expect(Object.keys((<NginxReverseProxyRouteTable>result).servers.serverCache).length).to.equal(2)
   })
 })
