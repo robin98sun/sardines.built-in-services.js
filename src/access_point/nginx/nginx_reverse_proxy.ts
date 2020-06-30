@@ -64,6 +64,7 @@ export interface NginxConfig {
   log_format?: string[]
   ssl_session_cache?: string
   ssl_session_timeout?: string
+  root?: string
 }
 
 export const defaultNginxConfig: NginxConfig = {
@@ -87,7 +88,8 @@ export const defaultNginxConfig: NginxConfig = {
   serversDir: '/etc/nginx/conf.d',
   sardinesServersFileName: 'sardines_servers.conf',
   ssl_session_cache: 'shared:SSL:10m',
-  ssl_session_timeout: '10m'
+  ssl_session_timeout: '10m',
+  root: '/'
 }
 
 const getServerConfDir = (configServer: string) => {
@@ -124,6 +126,8 @@ export interface NginxReverseProxyUpstreamCacheItem {
   loadBalancing?: Sardines.Runtime.LoadBalancingStrategy
   items?: NginxReverseProxyUpstreamItem[]
   protocol?: NginxReverseProxySupportedProtocol
+  port?: number
+  root?: string
 }
 
 export interface NginxReverseProxyUpstreamCache {
@@ -146,20 +150,23 @@ export interface NginxServer {
 }
 
 export interface NginxServerProxyOptions {
-  [key: string]: string
+  name: string
+  value: string
 }
 
-export const defaultProxySettings = {
+export const defaultProxyOptions = [
 
+]
+
+export interface NginxReverseProxyLocationItem {
+  upstream?: NginxReverseProxyUpstreamCacheItem
+  proxyOptions?: NginxServerProxyOptions[]
 }
 
 export interface NginxReverseProxyServerCacheItem {
   options: NginxServer
   locations: {
-    [path: string]: {
-      upstream?: NginxReverseProxyUpstreamCacheItem
-      proxyOptions?: NginxServerProxyOptions
-    }
+    [path: string]: NginxReverseProxyLocationItem
   }
 }
 
@@ -381,19 +388,37 @@ const parseServers = (content: string, upstreamCache: NginxReverseProxyUpstreamC
           const line = linestr.trim().replace(/(.+);/g, '$1').split(/[\s]+/g)
           if (line.length >= 2 && line[0] === 'proxy_pass') {
             // parse upstream name
-            const parts = line[1].split('://')
+            let parts = line[1].split('://')
             if (parts.length !== 2) continue
             const protocol = parts[0].toLowerCase()
-            const upstreamName = parts[1]
+            const upstreamStr = parts[1]
+            let upstreamName = upstreamStr
+            let upstreamPort = 80
+            let upstreamRoot = ''
+            if (upstreamStr.indexOf(':')>0) {
+              parts = upstreamStr.split(':')
+              upstreamName = parts[0]
+              if (parts[1].indexOf('/') > 0) {
+                upstreamPort = Number(parts[1].substr(0,parts[1].indexOf('/')))
+                upstreamRoot = parts[1].substr(parts[1].indexOf('/'))
+              } else upstreamPort = Number(parts[1])
+              if (Number.isNaN(upstreamPort)) {
+                continue
+              }
+            } else if (protocol === 'https') {
+              upstreamPort = 443
+            }
+
             // ignore nonsense upstreams
             if (!upstreamCache[upstreamName]) continue
             // validate upstream's protocol
-            const upstreamObj = upstreamCache[upstreamName]
-            if (upstreamObj.protocol && upstreamObj.protocol.toLowerCase() !== protocol ) continue
+            const upstreamObj = Object.assign({}, upstreamCache[upstreamName])
+            // if (upstreamObj.protocol && upstreamObj.protocol.toLowerCase() !== protocol ) continue
             // update upstream's protocol if it's empty
-            if (!upstreamObj.protocol) {
-              upstreamObj.protocol = <NginxReverseProxySupportedProtocol>(protocol as keyof typeof NginxReverseProxySupportedProtocol)
-            }
+            // if (!upstreamObj.protocol) 
+            upstreamObj.protocol = <NginxReverseProxySupportedProtocol>(protocol as keyof typeof NginxReverseProxySupportedProtocol)
+            upstreamObj.port = upstreamPort
+            if (upstreamRoot) upstreamObj.root = upstreamRoot
             // save upstream
             if (!server.locations[locationPath]) server.locations[locationPath] = {}
             server.locations[locationPath].upstream = upstreamObj
@@ -410,8 +435,11 @@ const parseServers = (content: string, upstreamCache: NginxReverseProxyUpstreamC
             const proxyOptionName = line[0]
             const proxyOptionValue = line.slice(1).join(' ')
             if (!server.locations[locationPath]) server.locations[locationPath] = {}
-            if (!server.locations[locationPath].proxyOptions) server.locations[locationPath].proxyOptions = {}
-            server.locations[locationPath].proxyOptions[proxyOptionName] = proxyOptionValue
+            if (!server.locations[locationPath].proxyOptions) server.locations[locationPath].proxyOptions = []
+            server.locations[locationPath].proxyOptions.push({
+              name: proxyOptionName,
+              value: proxyOptionValue
+            })
           }
         }
         
@@ -509,10 +537,18 @@ export const writeRouteTable = async(routeTableFilePath: string, routetable: Ngi
         const locationObj = serverObj.locations[location]
         if (!locationObj.upstream || !locationObj.upstream.protocol || !locationObj.upstream.upstreamName) continue
         appendline(`\n    location ${location} {`)
-        appendline(`        proxy_pass ${locationObj.upstream.protocol}://${locationObj.upstream.upstreamName};`)
-        if (locationObj.proxyOptions) {
-          for (let optionName of Object.keys(locationObj.proxyOptions)) {
-            appendline(`        ${optionName} ${locationObj.proxyOptions[optionName]};`)
+        let upstreamStr = `${locationObj.upstream.protocol}://${locationObj.upstream.upstreamName}`
+        if ((locationObj.upstream.protocol === NginxReverseProxySupportedProtocol.HTTP && locationObj.upstream.port !==80 )
+        ||(locationObj.upstream.protocol === NginxReverseProxySupportedProtocol.HTTPS && locationObj.upstream.port !==443)) {
+          upstreamStr += `:${locationObj.upstream.port}`
+        }
+        if (locationObj.upstream.root) {
+          upstreamStr += locationObj.upstream.root
+        }
+        appendline(`        proxy_pass ${upstreamStr};`)
+        if (locationObj.proxyOptions && locationObj.proxyOptions.length) {
+          for (let op of locationObj.proxyOptions) {
+            appendline(`        ${op.name} ${op.value};`)
           }
         }
         appendline(`    }`)
@@ -548,6 +584,7 @@ export class NginxReverseProxy extends AccessPointProvider{
   private nginxConfig: NginxConfig
   private routeTableFilePath: string
   public isRunning: boolean
+  public root: string
 
   constructor(
     nginxConfigSettings: NginxConfig = defaultNginxConfig,
@@ -559,6 +596,7 @@ export class NginxReverseProxy extends AccessPointProvider{
     this.nginxConfig.serversDir = getServerConfDir(this.nginxConfig.serversDir!)
     this.routeTableFilePath = syspath.resolve(this.nginxConfig.serversDir!, `./${this.nginxConfig.sardinesServersFileName!}`)
     this.isRunning = false
+    this.root = this.nginxConfig.root!
   }
 
   public async start(option: {initalizeConfigFile: boolean}) {    
@@ -599,32 +637,10 @@ export class NginxReverseProxy extends AccessPointProvider{
 
   private pathForServiceRuntime(sr: Sardines.Runtime.Service, isDefault: boolean = false, options: NginxReverseProxyServiceRuntimeOptions) {
     if (isDefault || !sr.identity.version) {
-      return `/${options.root}/${sr.identity.application}/${sr.identity.module}/${sr.identity.name}`.replace(/\/\//g, '/')
+      return `/${this.root}/${options.root}/${sr.identity.application}/${sr.identity.module}/${sr.identity.name}`.replace(/\/\//g, '/')
     } else {
-      return `/${options.root}/${sr.identity.application}/${sr.identity.module}/${sr.identity.name}/${sr.identity.version}`.replace(/\/\//g, '/')
+      return `/${this.root}/${options.root}/${sr.identity.version}/${sr.identity.application}/${sr.identity.module}/${sr.identity.name}`.replace(/\/\//g, '/')
     }
-  }
-
-  private parseProviderInfo(pvdrInfo: any):string|string[] {
-    if (!pvdrInfo) return ''
-    if (typeof pvdrInfo !== 'object') return ''
-    if (Array.isArray(pvdrInfo) && pvdrInfo.length) {
-      const result = []
-      for (let subPvdrInfo of <Array<any>>pvdrInfo) {
-        result.push(this.parseProviderInfo(subPvdrInfo))
-      }
-      return result
-    } else {
-      let result = `${typeof pvdrInfo.protocol === 'string'?pvdrInfo.protocol.toLowerCase():'http'}://${pvdrInfo.host}`
-      if (pvdrInfo.protocol && pvdrInfo.port) {
-        if ((pvdrInfo.protocol.toLowerCase() === 'http' && pvdrInfo.port !== 80)
-          ||(pvdrInfo.protocol.toLowerCase() === 'https' && pvdrInfo.port !== 443)){
-          result+=`:${pvdrInfo.port}`
-        }
-      }
-      return result
-    }
-    
   }
 
   public async registerAccessPoints(accessPointList: NginxServer[], options: NginxServerActionOptions = defaultNginxServerActionOptions) {
@@ -749,7 +765,7 @@ export class NginxReverseProxy extends AccessPointProvider{
     if (!serverKey) {
       throw 'Invalid access point'
     }
-    const routetable: NginxReverseProxyRouteTable = <NginxReverseProxyRouteTable> await this.registerAccessPoints([accessPoint], {returnRouteTable: true})
+    const routetable: NginxReverseProxyRouteTable = <NginxReverseProxyRouteTable> await this.registerAccessPoints([accessPoint], {returnRouteTable: true, restart: false, writeServerConfigFileWithoutRestart: false})
     if (!routetable.servers.serverCache[serverKey]) {
       throw 'Invalid access point'
     }
@@ -757,21 +773,40 @@ export class NginxReverseProxy extends AccessPointProvider{
 
     // Register service runtimes
     let hasRouteTableModified = false
-    // update the route table    
-    for (let sr of runtimes) {
-      // validate service runtime data
+    let somethingWrong = false
+    
+    const isValidServiceRuntime = (sr: Sardines.Runtime.Service): boolean => {
       if (!sr.identity || !sr.entries || !Array.isArray(sr.entries) || !sr.entries.length
         || !sr.identity.application || !sr.identity.module || !sr.identity.name 
         || !sr.identity.version || sr.identity.version === '*'
         ) {
-        continue
+        return false
       }
-      // iterate the entries of the service runtime
+      return true
+    }
+    // generate upstream group
+    const generateNewUpstream = ():NginxReverseProxyUpstreamCacheItem=> {
+      return {
+        upstreamName: `${Date.now()}_${Math.round(Math.random()*1000)}`,
+        loadBalancing: options.loadBalance,
+        items: []
+      }
+    }
+    let newUpstreamList: { http: NginxReverseProxyUpstreamCacheItem, https: NginxReverseProxyUpstreamCacheItem} = {
+      http: generateNewUpstream(),
+      https: generateNewUpstream()
+    }
+    
+    let tempUpstreamItemCache:{[key:string]:any} = {}
+    let countItems = 0
+    for (let sr of runtimes) {
+      // validate service runtime data
+      if (!isValidServiceRuntime(sr)) continue
       for (let entry of sr.entries) {
         // ignore proxied entries
-        if (entry.type === Sardines.Runtime.ServiceEntryType.proxy) {
-          continue
-        }
+        // if (entry.type === Sardines.Runtime.ServiceEntryType.proxy) {
+        //   continue
+        // }
         // ignore invalid entries
         if (!entry.providerInfo || typeof entry.providerInfo !== 'object') {
           continue
@@ -786,32 +821,92 @@ export class NginxReverseProxy extends AccessPointProvider{
           ) {
           continue
         }
-        // prepare the upstream item for the provider
-        // const upstreamItem: NginxReverseProxyUpstreamItem = this.upstreamItemForProvider(pvdr)
 
-        // find the path in the route table
-        const defaultPath = this.pathForServiceRuntime(sr, true, options)
-        const pathList = [ this.pathForServiceRuntime(sr, false, options) ]
-        if (options.isDefaultVersion) {
-          pathList.push(defaultPath)
-        }
-        for (let path of pathList) {
-          // register service runtime on the path
-          if (!server.locations[path]) {
-            // create a upstream
-
-          } else {
-            // update current upstream
-            const upstream = server.locations[path]
-
+        const newUpstream = newUpstreamList[pvdr.protocol]
+        
+        if (!tempUpstreamItemCache[`${pvdr.protocol}://${pvdr.host}`]) {
+          const item: NginxReverseProxyUpstreamItem = {
+            server: pvdr.host,
+            weight: 1
           }
-
+          tempUpstreamItemCache[`${pvdr.protocol}://${pvdr.host}`] = []
+          if (pvdr.weight && typeof pvdr.weigit === 'number' && Number.isInteger(pvdr.weigit) && pvdr.weight > 1) {
+            item.weight = pvdr.weight
+          }
+          newUpstream.items.push(item)
+          countItems++
+        }
+        tempUpstreamItemCache[`${pvdr.protocol}://${pvdr.host}`].push(sr)
+      }
+    }
+    if (!countItems) {
+      throw `No valid provider info`
+    }
+    // search an existing upstream
+    for (let protocol of ['http', 'https']) {
+      for (let upstreamKey of Object.keys(routetable.upstreams.upstreamCache)) {
+        const upstreamObj = routetable.upstreams.upstreamCache[upstreamKey]
+        if (upstreamObj.items) {
+          if (upstreamObj.loadBalancing === newUpstreamList[protocol].loadBalancing) {
+            if (upstreamObj.items.length === newUpstreamList[protocol].items.length) {
+              if (utils.isEqual(upstreamObj.items, newUpstreamList[protocol].items)) {
+                newUpstreamList[protocol] = upstreamObj
+                break
+              }
+            }
+          }
         }
       }
     }
+    
+    // update route table
+    for (let sr of runtimes) {
+      // find the path in the route table
+      const defaultPath = this.pathForServiceRuntime(sr, true, options)
+      const pathList = [ this.pathForServiceRuntime(sr, false, options) ]
+      if (options.isDefaultVersion) {
+        pathList.push(defaultPath)
+      }
+      for (let path of pathList) {
+        // register service runtime on the path
+        if (!server.locations[path]) {
+          // create a location object
+          server.locations[path] = {
+            upstream: newUpstream,
+            proxyOptions: []
+          }
 
-    if (hasRouteTableModified) {
-      await writeRouteTable(this.routeTableFilePath, routetable)
+        } else {
+          // update current upstream
+          const locationObj = server.locations[path]
+          const upstreamName = locationObj.upstream.upstreamName
+          const upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
+          // merge newUpstream items into exinsting upstream items
+          // and update the load balancing policy
+          for (let item of newUpstream.items) {
+            if (routetable.upstreams && routetable.upstreams.reverseUpstreamCache ) {
+              if (!routetable.upstreams.reverseUpstreamCache[item.server]) {
+                upstreamObj.items.push(item)
+              } else if (!routetable.upstreams.reverseUpstreamCache[item.server][upstreamName]) {
+                upstreamObj.items.push(item)
+              } else if (item.weight !== routetable.upstreams.reverseUpstreamCache[item.server][upstreamName].weight) {
+                for (let i of upstreamObj.items) {
+                  if (i.server === item.server) {
+                    i.weight = item.weight
+                    break
+                  }
+                }
+              }
+            }
+          }
+          upstreamObj.loadBalancing = newUpstream.loadBalancing
+        }
+
+      }
+    }
+
+    if (hasRouteTableModified && !somethingWrong) {
+      await this.restart(routetable)
     }
 
     return result

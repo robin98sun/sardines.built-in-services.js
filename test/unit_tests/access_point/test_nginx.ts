@@ -31,6 +31,10 @@ export const execCmd = async (cmd: string) => {
   })
 }
 
+const rmTestConfig = async() => {
+  await execCmd(`rm -f ${tmp_routetable_filepath}`)
+}
+
 const routetable_filepath = path.resolve('./test/conf/nginx_sardines_server.conf')
 const tmp_routetable_filepath = path.resolve('./test/tmp_nginx_sardines_server.conf')
 
@@ -44,7 +48,6 @@ describe('[nginx] routetable', () => {
     expect(Object.keys(routetable.upstreams.upstreamCache).length).to.eq(4)
     expect(routetable.upstreams).to.has.property('reverseUpstreamCache')
     expect(routetable.upstreams.upstreamCache).to.has.property('myApp_HTTPS')
-    expect(routetable.upstreams.upstreamCache['myApp_HTTPS']).to.has.property('protocol', 'https')
     expect(routetable.upstreams.upstreamCache['myApp_HTTPS']).to.has.property('loadBalancing', 'workloadFocusing')
     expect(routetable.upstreams.upstreamCache['myApp_HTTPS']).to.has.property('upstreamName', 'myApp_HTTPS')
     expect(routetable.upstreams.upstreamCache['myApp_HTTPS']).to.has.property('items')
@@ -100,9 +103,17 @@ describe('[nginx] routetable', () => {
     expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['upstream']).to.has.property('upstreamName', 'myApp_HTTPS')
     expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['upstream']).to.has.property('protocol', 'https')
     expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['upstream']).to.has.property('loadBalancing', 'workloadFocusing')
-    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions']).to.has.property('proxy_cache', 'cache_zone')
-    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions']).to.has.property('proxy_cache_key', '$uri')
-    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions']).to.has.property('proxy_cache_purge', '$purge_method')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions'].length).to.eq(3)
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions'][0]).to.has.property('name', 'proxy_cache')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions'][0]).to.has.property('value', 'cache_zone')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions'][1]).to.has.property('name', 'proxy_cache_key')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions'][1]).to.has.property('value', '$uri')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions'][2]).to.has.property('name', 'proxy_cache_purge')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions'][2]).to.has.property('value', '$purge_method')
+
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].locations['/']['upstream']).does.not.has.property('root')
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].locations['/myApp2_root']['upstream']).to.has.property('root', '/app')
+    expect(routetable.servers.serverCache['@0.0.0.0:80:non-ssl,0.0.0.0:443:ssl@https.example.com'].locations['/myApp2_root/myApp1_root']['upstream']).to.has.property('root', '/')
 
   })
 
@@ -113,8 +124,8 @@ describe('[nginx] routetable', () => {
     const newRouteTable = await readRouteTable(tmp_routetable_filepath) 
     // console.log(utils.inspect(newRouteTable))
     expect(utils.isEqual(routetable, newRouteTable)).to.be.true
-    await execCmd(`rm -f ${tmp_routetable_filepath}`)
-    expect(fs.existsSync(tmp_routetable_filepath)).to.be.false
+    await rmTestConfig()
+    // expect(fs.existsSync(tmp_routetable_filepath)).to.be.false
   })
 
   it('should register access points', async() => {
@@ -178,7 +189,7 @@ describe('[nginx] routetable', () => {
     result = await proxy.registerAccessPoints(tmplist, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true})
     expect(result).to.be.instanceOf(Array)
     expect((<NginxServer[]>result).length).to.equal(0)    
-    await execCmd(`rm -f ${tmp_routetable_filepath}`)
+    await rmTestConfig()
   })
 
   it('should remove access points', async() => {
@@ -239,6 +250,6 @@ describe('[nginx] routetable', () => {
     expect((<NginxReverseProxyRouteTable>result).upstreams.upstreamCache['myApp_onlyone']).to.be.undefined
     expect(Object.keys((<NginxReverseProxyRouteTable>result).servers.serverCache).length).to.equal(2)
        
-    await execCmd(`rm -f ${tmp_routetable_filepath}`)
+    await rmTestConfig()
   })
 })
