@@ -94,6 +94,16 @@ describe('[nginx] routetable', () => {
     expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@172.20.20.200:443:ssl@inner.https.example.com']).to.has.property('locations')
     expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@172.20.20.200:443:ssl@inner.https.example.com'].locations.length).to.equal(1)
     expect(routetable.servers.reverseServerCache['myApp_HTTPS']['@172.20.20.200:443:ssl@inner.https.example.com'].locations[0]).to.equal('/myapp3_root')
+
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']).to.has.property('upstream')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']).to.has.property('proxyOptions')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['upstream']).to.has.property('upstreamName', 'myApp_HTTPS')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['upstream']).to.has.property('protocol', 'https')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['upstream']).to.has.property('loadBalancing', 'workloadFocusing')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions']).to.has.property('proxy_cache', 'cache_zone')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions']).to.has.property('proxy_cache_key', '$uri')
+    expect(routetable.servers.serverCache['@172.20.20.200:443:ssl@inner.https.example.com'].locations['/myapp3_root']['proxyOptions']).to.has.property('proxy_cache_purge', '$purge_method')
+
   })
 
   it('should write routetable to file', async()=> {
@@ -228,5 +238,7 @@ describe('[nginx] routetable', () => {
     expect((<NginxReverseProxyRouteTable>result).servers.serverCache[key]).to.be.undefined
     expect((<NginxReverseProxyRouteTable>result).upstreams.upstreamCache['myApp_onlyone']).to.be.undefined
     expect(Object.keys((<NginxReverseProxyRouteTable>result).servers.serverCache).length).to.equal(2)
+       
+    await execCmd(`rm -f ${tmp_routetable_filepath}`)
   })
 })
