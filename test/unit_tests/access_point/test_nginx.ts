@@ -60,7 +60,8 @@ describe('[nginx] routetable', () => {
     expect(routetable.upstreams.upstreamCache['myApp1'].items[0]).to.has.property('server', 'srv1.example.com')
     expect(routetable).to.has.property('servers')
     expect(routetable.servers).to.has.property('serverCache')
-    expect(Object.keys(routetable.servers.serverCache).length).to.equal(4)
+    expect(Object.keys(routetable.servers.serverCache).length).to.equal(5)
+    expect(routetable.servers.serverCache).to.have.property('@0.0.0.0:80:non-ssl@www.right.com')
     expect(routetable.servers.serverCache).to.have.property('@0.0.0.0:80:non-ssl@www.onlyone.com')
     expect(routetable.servers.serverCache).to.have.property('@0.0.0.0:80:non-ssl@www.example.com')
     expect(routetable.servers.serverCache).to.have.property('@172.20.20.200:443:ssl@inner.https.example.com')
@@ -119,7 +120,7 @@ describe('[nginx] routetable', () => {
 
   it('should write routetable to file', async()=> {
     const routetable = await readRouteTable(routetable_filepath)
-    await writeRouteTable(tmp_routetable_filepath, routetable)
+    await writeRouteTable(tmp_routetable_filepath, routetable, {appendDefaultProxyOptions: false})
     expect(fs.existsSync(tmp_routetable_filepath)).to.be.true
     const newRouteTable = await readRouteTable(tmp_routetable_filepath) 
     // console.log(utils.inspect(newRouteTable))
@@ -248,7 +249,7 @@ describe('[nginx] routetable', () => {
     expect(result).to.be.instanceOf(Object)
     expect((<NginxReverseProxyRouteTable>result).servers.serverCache[key]).to.be.undefined
     expect((<NginxReverseProxyRouteTable>result).upstreams.upstreamCache['myApp_onlyone']).to.be.undefined
-    expect(Object.keys((<NginxReverseProxyRouteTable>result).servers.serverCache).length).to.equal(2)
+    expect(Object.keys((<NginxReverseProxyRouteTable>result).servers.serverCache).length).to.equal(3)
        
     await rmTestConfig()
   })
