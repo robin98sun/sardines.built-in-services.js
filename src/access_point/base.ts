@@ -3,7 +3,6 @@ import { Sardines } from 'sardines-core'
 export interface AccessPointServiceRuntimeOptions {
   isDefaultVersion: boolean,
   loadBalance?: Sardines.Runtime.LoadBalancingStrategy
-  weight?: number
   proxyOptions?: any
 }
 

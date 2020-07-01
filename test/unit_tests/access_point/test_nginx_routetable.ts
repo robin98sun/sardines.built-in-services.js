@@ -37,6 +37,9 @@ const rmTestConfig = async() => {
 
 const routetable_filepath = path.resolve('./test/conf/nginx_sardines_server.conf')
 const tmp_routetable_filepath = path.resolve('./test/tmp_nginx_sardines_server.conf')
+const nginxConfig: NginxConfig = {}
+nginxConfig.serversDir = path.resolve('./test/')
+nginxConfig.sardinesServersFileName = 'tmp_nginx_sardines_server.conf'
 
 describe('[nginx] routetable', () => {
   it('should read routetable', async () => {
@@ -132,10 +135,6 @@ describe('[nginx] routetable', () => {
   it('should register access points', async() => {
     const routetable = await readRouteTable(routetable_filepath)
     await writeRouteTable(tmp_routetable_filepath, routetable)
-
-    const nginxConfig: NginxConfig = {}
-    nginxConfig.serversDir = path.resolve('./test/')
-    nginxConfig.sardinesServersFileName = 'tmp_nginx_sardines_server.conf'
 
     const proxy = new NginxReverseProxy(nginxConfig)
     try {
@@ -253,4 +252,5 @@ describe('[nginx] routetable', () => {
        
     await rmTestConfig()
   })
+
 })
