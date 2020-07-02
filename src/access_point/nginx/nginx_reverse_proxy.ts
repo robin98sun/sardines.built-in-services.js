@@ -2,7 +2,7 @@
  * @author Robin Sun
  * @email robin@naturewake.com
  * @create date 2020-06-15 14:42:59
- * @modify date 2020-06-15 14:42:59
+ * @modify date 2020-07-01 17:20:00
  * @desc config nginx server to be a reverse proxy server
  * @desc nginx doc: https://nginx.org/en/docs/
  */
@@ -577,6 +577,7 @@ export interface NginxReverseProxySupprotedProviderInfo {
   driver: string
   root?: string
   weight?: number
+  type?: Sardines.Runtime.ServiceEntryType
 }
 
 export interface NginxReverseProxySupportedServiceRuntime {
@@ -585,10 +586,10 @@ export interface NginxReverseProxySupportedServiceRuntime {
   providers: NginxReverseProxySupprotedProviderInfo[]
 }
 
-const validServiceRuntime = async (sr: Sardines.Runtime.Service): Promise<NginxReverseProxySupportedServiceRuntime> => {
+const validServiceRuntime = async (sr: Sardines.Runtime.Service, options: {noEmptyProviders: boolean, acceptAsteriskVersion: boolean} = {noEmptyProviders: true, acceptAsteriskVersion: false}): Promise<NginxReverseProxySupportedServiceRuntime> => {
   if (!sr.identity || !sr.entries || !Array.isArray(sr.entries) || !sr.entries.length
     || !sr.identity.application || !sr.identity.module || !sr.identity.name 
-    || !sr.identity.version || sr.identity.version === '*'
+    || !sr.identity.version || (sr.identity.version === '*' && !(options && options.acceptAsteriskVersion))
     ) {
     throw `invalid service runtime`
   }
@@ -625,18 +626,48 @@ const validServiceRuntime = async (sr: Sardines.Runtime.Service): Promise<NginxR
 
       if (driver === null) {
         driver = pvdr.driver
-      } else if (driver !== pvdr.driver) {
+      } else if (driver !== pvdr.driver && options && options.noEmptyProviders) {
         throw `service runtime have multiple entries using different drivers`
       }
+      if (entry.type) pvdr.type = entry.type
       providers.push(pvdr)
       providerCache[pvdrKey] = true
     }
   }
-  if (!providers.length) {
+  if (!providers.length && options && options.noEmptyProviders) {
     throw `no valid provider in the service runtime information`
   }
 
   return {protocol: protocol!, serviceIdentity: sr.identity, providers}
+}
+
+
+const createUpstreamName = () => {
+  return `${Date.now()}_${Math.round(Math.random()*1000)}`
+}
+const createUpstreamObject = (
+  copy: NginxReverseProxyUpstreamCacheItem|null = null,
+  options: {loadBalance: Sardines.Runtime.LoadBalancingStrategy, protocol: NginxReverseProxySupportedProtocol} = {loadBalance: Sardines.Runtime.LoadBalancingStrategy.evenWorkload, protocol: NginxReverseProxySupportedProtocol.HTTP}
+  ):NginxReverseProxyUpstreamCacheItem => {
+  if (copy) {
+    const newUpstreamObj:NginxReverseProxyUpstreamCacheItem = Object.assign({}, copy)
+    if (copy.items) {
+      newUpstreamObj.items = []
+      for (let item of copy.items) {
+        newUpstreamObj.items.push(Object.assign({}, item))
+      }
+    }
+    newUpstreamObj.upstreamName = createUpstreamName()
+    return newUpstreamObj
+  } else {
+    const newUpstreamObj: NginxReverseProxyUpstreamCacheItem = {
+      upstreamName: createUpstreamName(),
+      loadBalancing: options.loadBalance,
+      items: [],
+      protocol: options.protocol,
+    }
+    return newUpstreamObj
+  }
 }
 
 const findUpstreamForServiceRuntime = async (routetable: NginxReverseProxyRouteTable, serviceRuntime: Sardines.Runtime.Service, options: AccessPointServiceRuntimeOptions): Promise<{
@@ -648,12 +679,10 @@ const findUpstreamForServiceRuntime = async (routetable: NginxReverseProxyRouteT
     // validate service runtime data
     const sr = await validServiceRuntime(serviceRuntime)
       // generate upstream group
-    const newUpstreamItem: NginxReverseProxyUpstreamCacheItem = {
-      upstreamName: `${Date.now()}_${Math.round(Math.random()*1000)}`,
-      loadBalancing: options.loadBalance,
-      items: [],
-      protocol: sr.protocol,
-    }
+    const newUpstreamItem: NginxReverseProxyUpstreamCacheItem = createUpstreamObject(null, {
+      loadBalance: options.loadBalance,
+      protocol: sr.protocol
+    })
     
     let root = ''
     let driver = ''
@@ -993,16 +1022,6 @@ export class NginxReverseProxy extends AccessPointProvider{
               const upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
               // merge newUpstream items into exinsting upstream items
               for (let item of x.upstreamItem.items) {
-                // const matches = upstreamObj.items.filter(i=>(i.server===item.server&&(!i.port&&!item.port||i.port===item.port)))
-                // if (matches.length>1){
-                //   // remove duplicated items
-                //   upstreamObj.items =  upstreamObj.items.filter(i=>(!(i.server===item.server&&(!i.port&&!item.port||i.port===item.port))))
-                //   upstreamObj.items.push(item)
-                // } else if (matches.length === 1) {
-                //   matches[0].weight = item.weight
-                // } else {
-                //   upstreamObj.items.push(item)
-                // }
                 const reverseUpstreamCacheKey = `${item.server}${item.port?':'+item.port:''}`
                 const reverseUpstreamCacheItem = routetable.upstreams.reverseUpstreamCache[reverseUpstreamCacheKey]
                 if (!reverseUpstreamCacheItem || !reverseUpstreamCacheItem[upstreamName]) {
@@ -1021,7 +1040,8 @@ export class NginxReverseProxy extends AccessPointProvider{
                 port: inf.port,
                 protocol: (inf.ssl?NginxReverseProxySupportedProtocol.HTTPS:NginxReverseProxySupportedProtocol.HTTP),
                 root:p.root,
-                driver: x.serviceDriver
+                driver: x.serviceDriver,
+                isDefault: p.path === defaultPath.path
               }
             })
           }
@@ -1056,9 +1076,124 @@ export class NginxReverseProxy extends AccessPointProvider{
     return result
   }
 
-  public async removeServiceRuntimes(accessPoint: NginxServer, runtimes: Sardines.Runtime.Service[]):Promise<Sardines.Runtime.Service[]> {
-    const result: Sardines.Runtime.Service[] = []
+  public async removeServiceRuntimes(accessPoint: NginxServer, runtimes: Sardines.Runtime.Service[], options: NginxReverseProxyServiceRuntimeOptions = {isDefaultVersion: false}, actionOptions: NginxServerActionOptions = defaultNginxServerActionOptions):Promise<Sardines.Runtime.Service[]|NginxReverseProxyRouteTable> {
+    if (!accessPoint || !accessPoint.interfaces || !accessPoint.interfaces.length || !accessPoint.name) {
+      throw `invalid access point`
+    }
+    let routetable = await readRouteTable(this.routeTableFilePath)
+    const serverKey = keyOfNginxServer(accessPoint)
+    const server = routetable.servers.serverCache[serverKey]
+    if (!server) {
+      throw `access point does not exist`
+    }
 
+    const result: Sardines.Runtime.Service[] = []
+    if (!server.locations) {
+      if (actionOptions && actionOptions.returnRouteTable) return routetable
+      else return result  
+    }
+    let hasRouteTableModified = false
+    for (let runtime of runtimes) {
+      try {
+        const sr = await validServiceRuntime(runtime, {noEmptyProviders: false, acceptAsteriskVersion: true})
+
+        // get upstream object from server location object
+        let defaultPath = this.pathForServiceRuntime(sr.serviceIdentity, true, options)
+        let pathList = [this.pathForServiceRuntime(sr.serviceIdentity, false, options)]
+        if (options && options.isDefaultVersion && pathList[0] !== defaultPath) pathList.push(defaultPath)
+        if (sr.providers.length) {
+          // remove upstream server items one by one
+          const entries: Sardines.Runtime.ServiceEntry[] = []
+          for (let pvdr of sr.providers) {
+            // ignore non-exist providers
+            const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
+            if (!routetable.upstreams.reverseUpstreamCache[pvdrKey]) continue
+            for (let path of pathList) {
+              // ignore non-exist path
+              if (!server.locations[path]) continue
+              const locationObj = server.locations[path]
+              // ignore invalid location
+              if (!locationObj.upstream) {
+                console.log('WARNING: routetable structure is broken at server [', serverKey,'], location: [', path,'], which should has a valid upstream object')
+                continue
+              }
+              const upstreamName = locationObj.upstream.upstreamName
+              if (!routetable.upstreams.upstreamCache[upstreamName]) {
+                console.log('WARNING: routetable structure is broken in its upstream cache, which should contain upstream named:', upstreamName)
+                continue
+              }
+              let upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
+              // check the reverse server cache of the upstream
+              if (!routetable.servers.reverseServerCache[upstreamName]) {
+                console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', which does not exist in the reverse sever cache')
+                continue
+              }
+              if (!routetable.servers.reverseServerCache[upstreamName][serverKey]) {
+                console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', which reverse server cache item should contains server key:', serverKey)
+                continue
+              }
+              if (routetable.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(path) < 0){
+                console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', in which reverse server cache item should contains path [', path, '] in its server key', serverKey)
+                continue
+              }
+              // remove the location in the reverse server cache of the upstream
+              routetable.servers.reverseServerCache[upstreamName][serverKey].locations.splice(routetable.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(path),1)
+              // duplicate the upstream object, if it is referenced by other locations
+              let originUpstreamObj = upstreamObj
+              if (routetable.servers.reverseServerCache[upstreamName][serverKey].locations.length > 0) {
+                upstreamObj = createUpstreamObject(upstreamObj)
+              }
+              // remove the server item from the upstream obj
+              const port = (pvdr.port)?pvdr.port
+                           : (pvdr.protocol.toLowerCase() === 'https')
+                           ? 443
+                           : 80
+              let hasFoundItem = false
+              for (let i = upstreamObj.items.length - 1; i>=0; i--) {
+                const item = upstreamObj.items[i]
+                if (item.port === port && item.server === pvdr.host) {
+                  upstreamObj.items.splice(i,1)
+                  hasFoundItem = true
+                  break
+                }
+              }
+              if (!hasFoundItem) continue
+              // remove empty upstream object
+              // and remove location object if upstream is removed
+              if (upstreamObj.items.length === 0) {
+                delete routetable.upstreams.upstreamCache[upstreamName]
+                delete server.locations[path]
+              }
+              // remove non-useful pvdr from reverse upstream cache
+              delete routetable.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]
+              if (Object.keys(routetable.upstreams.reverseUpstreamCache[pvdrKey]).length === 0) {
+                delete routetable.upstreams.reverseUpstreamCache[pvdrKey]
+              }
+
+              if (!hasRouteTableModified) hasRouteTableModified = true
+              const type = pvdr.type || Sardines.Runtime.ServiceEntryType.dedicated
+              if (pvdr.type) delete pvdr.type
+              entries.push({
+                type: type,
+                providerInfo: pvdr
+              })
+            }
+          }
+          if (entries.length) {
+            result.push({
+              identity: sr.serviceIdentity,
+              entries
+            })
+          }
+        } else {
+          // remove entire path for the service runtime
+
+        }
+      } catch (e) {
+        console.log('WARNING: error while validating service runtime:', runtime, ', error:', e)
+        continue
+      }
+    }
     return result
   }
 }

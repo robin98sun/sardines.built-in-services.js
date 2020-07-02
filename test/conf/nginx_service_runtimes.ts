@@ -84,3 +84,53 @@ export const test_case_register_service_runtimes_correct_1 :NginxReverseProxySer
     root: '/some/place/on/proxy/server'
   }
 }
+
+
+export const test_case_remove_service_runtimes_correct_1:NginxReverseProxyServiceRuntimeTestCase = {
+  accessPoint: {
+    interfaces: [{
+      port: 80,
+      ssl: false
+    }],
+    name: 'nginx-reverse-proxy-server.domain'
+  },
+  runtimes: [{
+    identity:{
+      application: 'test-application',
+      module: 'module1',
+      name: 'service3',
+      version: '1.0.3'
+    },
+    entries: []
+  }, {
+    identity: {
+      application: 'test-application',
+      module: 'module1',
+      name: 'service1',
+      version: '1.0.3'
+    },
+    entries: [{
+      type: Sardines.Runtime.ServiceEntryType.dedicated,
+      providerInfo: {
+        host: 'inner-server-1',
+        port: 8081,
+        protocol: 'http',
+        root: '/dir/on/inner/server',
+        driver: 'inner-service-http-driver'
+      }
+    }, {
+      type: Sardines.Runtime.ServiceEntryType.dedicated,
+      providerInfo: {
+        host: 'inner-server-2',
+        port: 8000,
+        protocol: 'http',
+        root: '/dir/on/inner/server',
+        driver: 'inner-service-http-driver',
+        weight: 3
+      }
+    }]
+  }],
+  options: {
+    isDefaultVersion: true
+  }
+}
