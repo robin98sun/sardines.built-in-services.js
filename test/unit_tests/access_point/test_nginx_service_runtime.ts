@@ -4,7 +4,8 @@ import 'mocha'
 import { expect } from 'chai'
 
 import { 
-  test_case_register_service_runtimes_correct_1
+  test_case_register_service_runtimes_correct_1,
+  test_case_remove_service_runtimes_correct_1
 } from '../../conf/nginx_service_runtimes'
 
 import {
@@ -21,15 +22,18 @@ nginxConfig.sardinesServersFileName = 'tmp_nginx_sardines_server.conf'
 nginxConfig.root = '/server/root'
 
 describe('[nginx] service runtime', async () => {
+  let proxy = null
+  before('preparing proxy instance', async() => {
+    proxy = new NginxReverseProxy(nginxConfig)
+  })
   it('should register service runtimes', async() => {
-    const proxy = new NginxReverseProxy(nginxConfig)
     let {
       accessPoint,
       runtimes,
       options
     } = test_case_register_service_runtimes_correct_1
-    let routetable = <NginxReverseProxyRouteTable>await proxy.registerServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: true, writeServerConfigFileWithoutRestart: true})
-    console.log(utils.inspect(routetable))
+    let routetable = <NginxReverseProxyRouteTable>await proxy.registerServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: true, writeServerConfigFileWithoutRestart: false})
+    // console.log(utils.inspect(routetable))
     expect(routetable).to.be.an.instanceof(Object)
     expect(routetable).to.has.property('upstreams')
     expect(routetable).to.has.property('servers')
@@ -94,6 +98,14 @@ describe('[nginx] service runtime', async () => {
   })
 
   it('should remove service runtimes', async() => {
-
+    let {
+      accessPoint,
+      runtimes,
+      options
+    } = test_case_remove_service_runtimes_correct_1
+    // let routetable = <NginxReverseProxyRouteTable>await proxy.removeServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: true, writeServerConfigFileWithoutRestart: true}) 
+    // console.log(utils.inspect(routetable))
+    let result = <NginxReverseProxyRouteTable>await proxy.removeServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: false}) 
+    console.log(utils.inspect(result))
   })
 })

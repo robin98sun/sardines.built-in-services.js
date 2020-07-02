@@ -587,7 +587,7 @@ export interface NginxReverseProxySupportedServiceRuntime {
 }
 
 const validServiceRuntime = async (sr: Sardines.Runtime.Service, options: {noEmptyProviders: boolean, acceptAsteriskVersion: boolean} = {noEmptyProviders: true, acceptAsteriskVersion: false}): Promise<NginxReverseProxySupportedServiceRuntime> => {
-  if (!sr.identity || !sr.entries || !Array.isArray(sr.entries) || !sr.entries.length
+  if (!sr.identity || !sr.entries || !Array.isArray(sr.entries) || (!sr.entries.length && options && options.noEmptyProviders)
     || !sr.identity.application || !sr.identity.module || !sr.identity.name 
     || !sr.identity.version || (sr.identity.version === '*' && !(options && options.acceptAsteriskVersion))
     ) {
@@ -712,7 +712,7 @@ const saveUpstreamObject = (routetable: NginxReverseProxyRouteTable,  upstreamOb
   return hasRouteTableModified
 }
 
-const removeItemFromUpstreamObject = (routetable: NginxReverseProxyRouteTable,  upstream : NginxReverseProxyUpstreamCacheItem, serverKey: string, location: string, pvdr: NginxReverseProxySupprotedProviderInfo) => {
+const removeItemFromUpstreamObject = (routetable: NginxReverseProxyRouteTable,  upstream : NginxReverseProxyUpstreamCacheItem, serverKey: string, location: string, pvdr: NginxReverseProxySupprotedProviderInfo|null = null) => {
   let upstreamObj = upstream
   let hasRouteTableModified = false
   if (!routetable || !upstreamObj || !upstreamObj.upstreamName || !serverKey || !location || !pvdr) return hasRouteTableModified
@@ -739,63 +739,87 @@ const removeItemFromUpstreamObject = (routetable: NginxReverseProxyRouteTable,  
     console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', which reverse server cache item should contains server key:', serverKey)
     return hasRouteTableModified
   }
-  if (routetable.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(location) < 0){
+  const locationIndexInReverseServerCache = routetable.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(location)
+  if (locationIndexInReverseServerCache < 0){
     console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', in which reverse server cache item should contains path [', location, '] in its server key', serverKey)
     return hasRouteTableModified
   }
-  // locate the provider item in the location
-  const port = (pvdr.port)?pvdr.port: (pvdr.protocol.toLowerCase() === 'https')? 443: 80
-  let itemIndex = -1
-  for (let i = upstreamObj.items.length - 1; i>=0; i--) {
-    const item = upstreamObj.items[i]
-    if (item.port === port && item.server === pvdr.host) {
-      itemIndex = i
-      break
-    }
-  }
-  if (itemIndex < 0) return hasRouteTableModified
-  
-  // duplicate the upstream object, if it is referenced by other locations
-  if (routetable.servers.reverseServerCache[upstreamName][serverKey].locations.length > 1) {
-    // remove the location in the reverse server cache of the upstream
-    const locationIndex = routetable.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(location)
-    routetable.servers.reverseServerCache[upstreamName][serverKey].locations.splice(locationIndex,1)
-    upstreamObj = createUpstreamObject(upstreamObj)
-    upstreamName = upstreamObj.upstreamName
-    let saved = saveUpstreamObject(routetable, upstreamObj, serverKey, location)
-    if (!saved) {
-      return hasRouteTableModified
-    }
-  }
-  // remove the server item from the upstream obj
-  upstreamObj.items.splice(itemIndex,1)
-  // remove non-useful pvdr from reverse upstream cache
-  const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
-  if (routetable.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]) {
-    delete routetable.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]
-  }
-  if (Object.keys(routetable.upstreams.reverseUpstreamCache[pvdrKey]).length === 0) {
-    delete routetable.upstreams.reverseUpstreamCache[pvdrKey]
-  }
-
-  // remove empty upstream object
-  if (upstreamObj.items.length === 0) {
-    delete routetable.upstreams.upstreamCache[upstreamName]
-    // remove all locations which reference this upstream
-    for (let s of Object.keys(routetable.servers.reverseServerCache[upstreamName])) {
-      for (let l of routetable.servers.reverseServerCache[upstreamName][s].locations) {
-        delete routetable.servers.serverCache[s].locations[l]
+  if (pvdr) {
+    // locate the provider item in the location
+    let itemIndex = -1
+    const port = (pvdr.port)?pvdr.port: (pvdr.protocol.toLowerCase() === 'https')? 443: 80
+    for (let i = upstreamObj.items.length - 1; i>=0; i--) {
+      const item = upstreamObj.items[i]
+      if (item.port === port && item.server === pvdr.host) {
+        itemIndex = i
+        break
       }
     }
-    // make sure the target location is removed
-    if (routetable.servers.serverCache[serverKey].locations[location]) {
-      delete routetable.servers.serverCache[serverKey].locations[location]
+    if (itemIndex < 0) return hasRouteTableModified
+    // duplicate the upstream object, if it is referenced by other locations
+    if (routetable.servers.reverseServerCache[upstreamName][serverKey].locations.length > 1) {
+      // remove the location in the reverse server cache of the upstream
+      const locationIndex = routetable.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(location)
+      routetable.servers.reverseServerCache[upstreamName][serverKey].locations.splice(locationIndex,1)
+      upstreamObj = createUpstreamObject(upstreamObj)
+      upstreamName = upstreamObj.upstreamName
+      let saved = saveUpstreamObject(routetable, upstreamObj, serverKey, location)
+      if (!saved) {
+        return hasRouteTableModified
+      }
     }
-    // remove the upstream in cache
-    delete routetable.servers.reverseServerCache[upstreamName]
+    // remove the server item from the upstream obj
+    upstreamObj.items.splice(itemIndex,1)
+    // remove non-useful pvdr from reverse upstream cache
+    const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
+    if (routetable.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]) {
+      delete routetable.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]
+    }
+    if (Object.keys(routetable.upstreams.reverseUpstreamCache[pvdrKey]).length === 0) {
+      delete routetable.upstreams.reverseUpstreamCache[pvdrKey]
+    }
+    // remove empty upstream object
+    if (upstreamObj.items.length === 0) {
+      delete routetable.upstreams.upstreamCache[upstreamName]
+      // remove all locations which reference this upstream
+      for (let s of Object.keys(routetable.servers.reverseServerCache[upstreamName])) {
+        for (let l of routetable.servers.reverseServerCache[upstreamName][s].locations) {
+          delete routetable.servers.serverCache[s].locations[l]
+        }
+      }
+      // make sure the target location is removed
+      if (routetable.servers.serverCache[serverKey].locations[location]) {
+        delete routetable.servers.serverCache[serverKey].locations[location]
+      }
+      // remove the upstream in cache
+      delete routetable.servers.reverseServerCache[upstreamName]
+    }
+  } else {
+    delete routetable.servers.serverCache[serverKey].locations[location]
+    routetable.servers.reverseServerCache[upstreamName][serverKey].locations.splice(locationIndexInReverseServerCache,1)
   }
-  
-
+  if (routetable.servers.reverseServerCache[upstreamName]) {
+    const serverKeyList =  Object.keys(routetable.servers.reverseServerCache[upstreamName]).map(k=>k.toString())
+    for (let s of serverKeyList) {
+      const serverCache = routetable.servers.reverseServerCache[upstreamName][s]
+      if (!serverCache.locations || !serverCache.locations.length) {
+        delete routetable.servers.reverseServerCache[upstreamName][s]
+      }
+    }
+    if (Object.keys(routetable.servers.reverseServerCache[upstreamName]).length === 0) {
+      delete routetable.servers.reverseServerCache[upstreamName]
+      for (let item of upstreamObj.items) {
+        const itemKey = `${item.server}${item.port?':'+item.port:''}`
+        if (routetable.upstreams.reverseUpstreamCache[itemKey] && routetable.upstreams.reverseUpstreamCache[itemKey][upstreamName]) {
+          delete routetable.upstreams.reverseUpstreamCache[itemKey][upstreamName]
+        }
+        if (!Object.keys(routetable.upstreams.reverseUpstreamCache[itemKey]).length) {
+          delete routetable.upstreams.reverseUpstreamCache[itemKey]
+        }
+      }
+      delete routetable.upstreams.upstreamCache[upstreamName]
+    }
+  }
 }
 
 const findUpstreamForServiceRuntime = async (routetable: NginxReverseProxyRouteTable, serviceRuntime: Sardines.Runtime.Service, options: AccessPointServiceRuntimeOptions): Promise<{
@@ -941,9 +965,13 @@ export class NginxReverseProxy extends AccessPointProvider{
     }
   }
 
+  private subPathForServiceRuntime(sr: Sardines.ServiceIdentity) {
+    return `/${sr.application}/${sr.module}/${sr.name}`.replace(/\/+/g, '/')
+  }
+
   private pathForServiceRuntime(sr: Sardines.ServiceIdentity, isDefault: boolean = false, options: NginxReverseProxyServiceRuntimeOptions) {
     const root = this.rootForServiceRuntime(sr, isDefault, options)
-    return `/${root}/${sr.application}/${sr.module}/${sr.name}`.replace(/\/+/g, '/')
+    return `/${root}/${this.subPathForServiceRuntime(sr)}`.replace(/\/+/g, '/')
   }
 
   public async registerAccessPoints(accessPointList: NginxServer[], options: NginxServerActionOptions = defaultNginxServerActionOptions) {
@@ -1216,42 +1244,67 @@ export class NginxReverseProxy extends AccessPointProvider{
     }
 
     const result: Sardines.Runtime.Service[] = []
-    if (!server.locations) {
-      if (actionOptions && actionOptions.returnRouteTable) return routetable
-      else return result  
-    }
-    let hasRouteTableModified = false
-    for (let runtime of runtimes) {
-      try {
-        const sr = await validServiceRuntime(runtime, {noEmptyProviders: false, acceptAsteriskVersion: true})
-
-        // get upstream object from server location object
-        let defaultPath = this.pathForServiceRuntime(sr.serviceIdentity, true, options)
-        let pathList = [this.pathForServiceRuntime(sr.serviceIdentity, false, options)]
-        if (options && options.isDefaultVersion && pathList[0] !== defaultPath) pathList.push(defaultPath)
-        if (sr.providers.length) {
-          // remove upstream server items one by one
+    if (server.locations) {
+      let hasRouteTableModified = false
+      for (let runtime of runtimes) {
+        try {
+          const sr = await validServiceRuntime(runtime, {noEmptyProviders: false, acceptAsteriskVersion: true})
           const entries: Sardines.Runtime.ServiceEntry[] = []
-          for (let pvdr of sr.providers) {
-            // ignore non-exist providers
-            const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
-            if (!routetable.upstreams.reverseUpstreamCache[pvdrKey]) continue
-            for (let path of pathList) {
-              // ignore non-exist path
-              if (!server.locations[path]) continue
-              // remove pvdr from location
-              const locationObj = server.locations[path]
-              let upstreamName = locationObj.upstream.upstreamName
-              let upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
-              const saved = removeItemFromUpstreamObject(routetable, upstreamObj, serverKey, path, pvdr)
-              if (!saved) continue
-              if (!hasRouteTableModified) hasRouteTableModified = true
-              const type = pvdr.type || Sardines.Runtime.ServiceEntryType.dedicated
-              if (pvdr.type) delete pvdr.type
-              entries.push({
-                type: type,
-                providerInfo: pvdr
-              })
+          // get upstream object from server location object
+          let defaultPath = this.pathForServiceRuntime(sr.serviceIdentity, true, options)
+          let pathList = [this.pathForServiceRuntime(sr.serviceIdentity, false, options)]
+          if (options && options.isDefaultVersion && pathList[0] !== defaultPath) pathList.push(defaultPath)
+          if (sr.providers.length) {
+            // remove upstream server items one by one
+            for (let pvdr of sr.providers) {
+              // ignore non-exist providers
+              const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
+              if (!routetable.upstreams.reverseUpstreamCache[pvdrKey]) continue
+              for (let path of pathList) {
+                // ignore non-exist path
+                if (!server.locations[path]) continue
+                // remove pvdr from location
+                const locationObj = server.locations[path]
+                let upstreamName = locationObj.upstream.upstreamName
+                let upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
+                const saved = removeItemFromUpstreamObject(routetable, upstreamObj, serverKey, path, pvdr)
+                if (!saved) continue
+                if (!hasRouteTableModified) hasRouteTableModified = true
+                const type = pvdr.type || Sardines.Runtime.ServiceEntryType.dedicated
+                if (pvdr.type) delete pvdr.type
+                entries.push({
+                  type: type,
+                  providerInfo: pvdr
+                })
+              }
+            }
+          } else {
+            // remove all paths for the service runtime
+            const defaultRoot = this.rootForServiceRuntime(sr.serviceIdentity,true, options)
+            const subpath = this.subPathForServiceRuntime(sr.serviceIdentity)
+            for (let location of Object.keys(server.locations)) {
+              const regexStr = `${defaultRoot}/[version_place_holder]/${subpath}`
+                                .replace(/\/+/g, '/')
+                                .replace('[version_place_holder]', '[^/]+')
+              const regex = new RegExp(regexStr)
+              if (regex.test(location) || location === defaultPath) {
+                const upstreamName = server.locations[location].upstream.upstreamName
+                const upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
+                const saved = removeItemFromUpstreamObject(routetable, upstreamObj, serverKey, location)
+                if (saved) {
+                  for(let inf of server.options.interfaces) {
+                    entries.push({
+                      type: Sardines.Runtime.ServiceEntryType.proxy,
+                      providerInfo: {
+                        host: server.options.name,
+                        port: inf.port,
+                        root: (location.substr(0, location.indexOf(subpath))+'/').replace(/\/+/g, '/'),
+                        protocol: inf.ssl?NginxReverseProxySupportedProtocol.HTTPS:NginxReverseProxySupportedProtocol.HTTP
+                      }
+                    })
+                  }
+                }
+              }
             }
           }
           if (entries.length) {
@@ -1260,15 +1313,13 @@ export class NginxReverseProxy extends AccessPointProvider{
               entries
             })
           }
-        } else {
-          // remove entire path for the service runtime
-
+        } catch (e) {
+          console.log('WARNING: error while validating service runtime:', runtime, ', error:', e)
+          continue
         }
-      } catch (e) {
-        console.log('WARNING: error while validating service runtime:', runtime, ', error:', e)
-        continue
       }
     }
-    return result
+    if (actionOptions && actionOptions.returnRouteTable) return routetable
+    else return result 
   }
 }
