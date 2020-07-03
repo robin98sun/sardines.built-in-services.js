@@ -2,13 +2,13 @@ import { Sardines } from 'sardines-core'
 // import { AccessPointServiceRuntimeOptions } from '../../src/access_point/base'
 import { 
   NginxServer,
-  NginxReverseProxyServiceRuntimeOptions
-} from '../../src/access_point/nginx/nginx_reverse_proxy'
+  NginxReversedProxyServiceRuntimeOptions,
+} from '../../src/access_point/nginx/nginx_reversed_proxy'
 
 export interface NginxReverseProxyServiceRuntimeTestCase {
   accessPoint: NginxServer,
   runtimes: Sardines.Runtime.Service[],
-  options: NginxReverseProxyServiceRuntimeOptions
+  options: NginxReversedProxyServiceRuntimeOptions
 }
 
 const generateServiceRuntimes = (data: {identities: Sardines.ServiceIdentity[], entries: Sardines.Runtime.ServiceEntry[]}) => {

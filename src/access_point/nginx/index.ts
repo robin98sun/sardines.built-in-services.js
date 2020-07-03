@@ -6,13 +6,13 @@ import { utils } from 'sardines-core'
 import { 
   NginxReverseProxy, 
   NginxConfig
-} from './nginx_reverse_proxy'
+} from './nginx_reversed_proxy'
 
 export {
   NginxReverseProxySupportedProtocol, 
   NginxReverseProxyServiceRuntimeOptions,
   NginxReverseProxyAccessPoint
-} from './nginx_reverse_proxy'
+} from './nginx_reversed_proxy'
 
 
 let proxy: NginxReverseProxy|null = null
