@@ -39,7 +39,7 @@ describe('[nginx] service runtime', async () => {
     if (round === 1) {
       expect(Object.keys(routetable.upstreams.upstreamCache).length).to.equal(1)
     } else {
-      // expect(Object.keys(routetable.upstreams.upstreamCache).length).to.equal(3)
+      expect(Object.keys(routetable.upstreams.upstreamCache).length).to.equal(2)
     }
     const upstreamName = Object.keys(routetable.upstreams.upstreamCache)[0]
     const upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
@@ -77,8 +77,8 @@ describe('[nginx] service runtime', async () => {
     } else {
       expect(serverObj.locations).to.not.has.property('/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service3')
       expect(serverObj.locations).to.not.has.property('/server/root/some/place/on/proxy/server/test-application/module1/service3')
-      // expect(serverObj.locations['/server/root/some/place/on/proxy/server/test-application/module1/service1'].upstream.items.length).to.eq(1)
-      // expect(serverObj.locations['/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service1'].upstream.items.length).to.eq(1)
+      expect(serverObj.locations['/server/root/some/place/on/proxy/server/test-application/module1/service1'].upstream.items.length).to.eq(1)
+      expect(serverObj.locations['/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service1'].upstream.items.length).to.eq(1)
     }
   }
 
