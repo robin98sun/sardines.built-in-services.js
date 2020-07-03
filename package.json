@@ -44,6 +44,7 @@
         "test": "mocha -r ts-node/register --exit test/unit_tests/**/*.ts",
         "testNginx": "mocha -r ts-node/register --exit test/unit_tests/access_point/test_nginx_*.ts",
         "testNginxSR": "mocha -r ts-node/register --exit test/unit_tests/access_point/test_nginx_service_runtime.ts",
+        "testNginxRT": "mocha -r ts-node/register --exit test/unit_tests/access_point/test_nginx_routetable.ts",
         "build": "npm run clear && tsc --build conf/tsconfig.json",
         "compile": "rm -f sardines-local-services.json && sardines-compile ./src --gen-services --recompile",
         "reverseCompile": "sardines-compile --reverse ./src",

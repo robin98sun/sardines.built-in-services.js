@@ -1,14 +1,14 @@
 import 'mocha'
 import { expect } from 'chai'
 import { 
-  readRouteTable,
-  writeRouteTable,
   NginxReverseProxy,
-  NginxConfig,
+  NginxConfig
+} from '../../../src/access_point/nginx/nginx_reverse_proxy'
+import {
   NginxServer,
   keyOfNginxServer,
   NginxReverseProxyRouteTable
-} from '../../../src/access_point/nginx/nginx_reverse_proxy'
+} from '../../../src/access_point/nginx/nginx_reverse_proxy_routetable'
 import {utils} from 'sardines-core'
 
 import * as fs from 'fs'
@@ -43,7 +43,8 @@ nginxConfig.sardinesServersFileName = 'tmp_nginx_sardines_server.conf'
 
 describe('[nginx] routetable', () => {
   it('should read routetable', async () => {
-    const routetable = await readRouteTable(routetable_filepath)
+    const routetable = new NginxReverseProxyRouteTable(routetable_filepath)
+    await routetable.readRouteTable()
     // console.log(utils.inspect(routetable))
     expect(routetable).to.be.an.instanceof(Object)
     expect(routetable).to.has.property('upstreams')
@@ -122,10 +123,12 @@ describe('[nginx] routetable', () => {
   })
 
   it('should write routetable to file', async()=> {
-    const routetable = await readRouteTable(routetable_filepath)
-    await writeRouteTable(tmp_routetable_filepath, routetable, {appendDefaultProxyOptions: false})
+    const routetable = new NginxReverseProxyRouteTable(routetable_filepath) 
+    await routetable.readRouteTable()
+    await routetable.writeRouteTable({appendDefaultProxyOptions: false, newFilePath: tmp_routetable_filepath} )
     expect(fs.existsSync(tmp_routetable_filepath)).to.be.true
-    const newRouteTable = await readRouteTable(tmp_routetable_filepath) 
+    const newRouteTable = new NginxReverseProxyRouteTable(tmp_routetable_filepath) 
+    await newRouteTable.readRouteTable() 
     // console.log(utils.inspect(newRouteTable))
     expect(utils.isEqual(routetable, newRouteTable)).to.be.true
     await rmTestConfig()
@@ -133,8 +136,9 @@ describe('[nginx] routetable', () => {
   })
 
   it('should register access points', async() => {
-    const routetable = await readRouteTable(routetable_filepath)
-    await writeRouteTable(tmp_routetable_filepath, routetable)
+    const routetable = new NginxReverseProxyRouteTable(routetable_filepath) 
+    await routetable.readRouteTable()
+    await routetable.writeRouteTable({newFilePath: tmp_routetable_filepath})
 
     const proxy = new NginxReverseProxy(nginxConfig)
     try {
@@ -193,8 +197,9 @@ describe('[nginx] routetable', () => {
   })
 
   it('should remove access points', async() => {
-    let routetable = await readRouteTable(routetable_filepath)
-    await writeRouteTable(tmp_routetable_filepath, routetable)
+    const routetable = new NginxReverseProxyRouteTable(routetable_filepath) 
+    await routetable.readRouteTable()
+    await routetable.writeRouteTable({newFilePath: tmp_routetable_filepath})
 
     const nginxConfig: NginxConfig = {}
     nginxConfig.serversDir = path.resolve('./test/')
@@ -237,7 +242,7 @@ describe('[nginx] routetable', () => {
     expect(utils.isEqual(testApList, result)).to.be.true
 
     // valid server
-    routetable = await readRouteTable(tmp_routetable_filepath)
+    await routetable.readRouteTable()
     expect(routetable.upstreams.upstreamCache).has.property('myApp_onlyone')
     testApList = [{
       interfaces: [ { port: 80, ssl: false } ],

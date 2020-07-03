@@ -10,36 +10,37 @@ import {
 
 import {
   NginxReverseProxy,
-  NginxConfig,
-  NginxReverseProxyRouteTable
+  NginxConfig
 } from '../../../src/access_point/nginx/nginx_reverse_proxy'
 
+import {
+  NginxReverseProxyRouteTable
+} from '../../../src/access_point/nginx/nginx_reverse_proxy_routetable'
+
 // const routetable_filepath = path.resolve('./test/conf/nginx_sardines_server.conf')
-// const tmp_routetable_filepath = path.resolve('./test/tmp_nginx_sardines_server.conf')
+const tmp_routetable_filepath = path.resolve('./test/tmp_nginx_sardines_server.conf')
 const nginxConfig: NginxConfig = {}
 nginxConfig.serversDir = path.resolve('./test/')
 nginxConfig.sardinesServersFileName = 'tmp_nginx_sardines_server.conf'
 nginxConfig.root = '/server/root'
 
 describe('[nginx] service runtime', async () => {
-  let proxy = null
+  let proxy: NginxReverseProxy = null
   before('preparing proxy instance', async() => {
     proxy = new NginxReverseProxy(nginxConfig)
   })
-  it('should register service runtimes', async() => {
-    let {
-      accessPoint,
-      runtimes,
-      options
-    } = test_case_register_service_runtimes_correct_1
-    let routetable = <NginxReverseProxyRouteTable>await proxy.registerServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: true, writeServerConfigFileWithoutRestart: false})
-    // console.log(utils.inspect(routetable))
+
+  const checkRouteTable = (routetable: NginxReverseProxyRouteTable, round: number = 1) => {
     expect(routetable).to.be.an.instanceof(Object)
     expect(routetable).to.has.property('upstreams')
     expect(routetable).to.has.property('servers')
     expect(routetable.upstreams).to.has.property('upstreamCache')
     expect(routetable.upstreams).to.has.property('reverseUpstreamCache')
-    expect(Object.keys(routetable.upstreams.upstreamCache).length).to.equal(1)
+    if (round === 1) {
+      expect(Object.keys(routetable.upstreams.upstreamCache).length).to.equal(1)
+    } else {
+      // expect(Object.keys(routetable.upstreams.upstreamCache).length).to.equal(3)
+    }
     const upstreamName = Object.keys(routetable.upstreams.upstreamCache)[0]
     const upstreamObj = routetable.upstreams.upstreamCache[upstreamName]
     expect(upstreamObj).to.has.property('upstreamName', upstreamName)
@@ -58,13 +59,41 @@ describe('[nginx] service runtime', async () => {
     expect(Object.keys(routetable.servers.serverCache).length).to.equal(1)
     expect(routetable.servers.serverCache).to.has.property('@0.0.0.0:80:non-ssl@nginx-reverse-proxy-server.domain')
     const serverObj = routetable.servers.serverCache['@0.0.0.0:80:non-ssl@nginx-reverse-proxy-server.domain']
-    expect(Object.keys(serverObj.locations).length).to.eq(6)
+    if (round === 1) {
+      expect(Object.keys(serverObj.locations).length).to.eq(6)
+    } else {
+      expect(Object.keys(serverObj.locations).length).to.eq(4)
+    }
     expect(serverObj.locations).to.has.property('/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service2')
     const locationObj = serverObj.locations['/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service2']
     expect(locationObj.upstream).to.has.property('upstreamName', upstreamName)
     expect(locationObj.upstream).to.has.property('root', '/dir/on/inner/server/test-application/module1/service2')
     expect(locationObj.upstream).to.has.property('protocol','http')
+    if (round === 1) {
+      expect(serverObj.locations).to.has.property('/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service3')
+      expect(serverObj.locations).to.has.property('/server/root/some/place/on/proxy/server/test-application/module1/service3')
+      expect(serverObj.locations['/server/root/some/place/on/proxy/server/test-application/module1/service1'].upstream.items.length).to.eq(3)
+      expect(serverObj.locations['/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service1'].upstream.items.length).to.eq(3)
+    } else {
+      expect(serverObj.locations).to.not.has.property('/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service3')
+      expect(serverObj.locations).to.not.has.property('/server/root/some/place/on/proxy/server/test-application/module1/service3')
+      // expect(serverObj.locations['/server/root/some/place/on/proxy/server/test-application/module1/service1'].upstream.items.length).to.eq(1)
+      // expect(serverObj.locations['/server/root/some/place/on/proxy/server/1.0.3/test-application/module1/service1'].upstream.items.length).to.eq(1)
+    }
+  }
 
+  it('should register service runtimes', async() => {
+    let {
+      accessPoint,
+      runtimes,
+      options
+    } = test_case_register_service_runtimes_correct_1
+    await proxy.registerServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: true, writeServerConfigFileWithoutRestart: true})
+
+    const routetable = new NginxReverseProxyRouteTable(tmp_routetable_filepath)
+    await routetable.readRouteTable()
+    // console.log(utils.inspect(routetable))
+    checkRouteTable(routetable, 1)
     let result = <Sardines.Runtime.Service[]> await proxy.registerServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true})
     expect(result).to.be.instanceOf(Array)
     expect(result.length).to.eq(3)
@@ -95,6 +124,9 @@ describe('[nginx] service runtime', async () => {
     expect(sr.entries[1].providerInfo).to.has.property('driver','inner-service-http-driver')
     expect(sr.entries[0].providerInfo).to.has.property('root','/server/root/some/place/on/proxy/server/1.0.3/')
     expect(sr.entries[1].providerInfo).to.has.property('root','/server/root/some/place/on/proxy/server/')
+    const newRoutetable = new NginxReverseProxyRouteTable(tmp_routetable_filepath)
+    await newRoutetable.readRouteTable()
+    expect(utils.isEqual(routetable, newRoutetable)).to.be.true
   })
 
   it('should remove service runtimes', async() => {
@@ -103,9 +135,15 @@ describe('[nginx] service runtime', async () => {
       runtimes,
       options
     } = test_case_remove_service_runtimes_correct_1
-    // let routetable = <NginxReverseProxyRouteTable>await proxy.removeServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: true, writeServerConfigFileWithoutRestart: true}) 
-    // console.log(utils.inspect(routetable))
-    let result = <NginxReverseProxyRouteTable>await proxy.removeServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: false}) 
-    console.log(utils.inspect(result))
+    const routetable = new NginxReverseProxyRouteTable(tmp_routetable_filepath)
+    await routetable.readRouteTable()
+    let result = <Sardines.Runtime.Service[]>await proxy.removeServiceRuntimes(accessPoint, runtimes, options, {restart: false, returnRouteTable: false, writeServerConfigFileWithoutRestart: true}) 
+    // console.log(utils.inspect(result))
+    const newRoutetable = new NginxReverseProxyRouteTable(tmp_routetable_filepath)
+    await newRoutetable.readRouteTable()
+    expect(utils.isEqual(routetable, newRoutetable)).to.be.false
+    checkRouteTable(newRoutetable, 2)
+    // console.log(utils.inspect(newRoutetable))
+
   })
 })

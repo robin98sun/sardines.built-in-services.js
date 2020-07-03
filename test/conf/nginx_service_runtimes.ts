@@ -131,6 +131,7 @@ export const test_case_remove_service_runtimes_correct_1:NginxReverseProxyServic
     }]
   }],
   options: {
-    isDefaultVersion: true
+    isDefaultVersion: true,
+    root: '/some/place/on/proxy/server'
   }
 }
