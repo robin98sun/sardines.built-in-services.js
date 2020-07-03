@@ -397,7 +397,7 @@ export class NginxReversedProxy extends AccessPointProvider{
     const result:Sardines.Runtime.Service[] = []
 
     // register access point if needed
-    // const serverKey = keyOfNginxServer(accessPoint)
+    await this.routetable.readRouteTable()
     await this.registerAccessPoints([accessPoint], {returnRouteTable: true, restart: false, writeServerConfigFileWithoutRestart: false})
     if (!this.routetable.hasServer(accessPoint)) {
       throw 'Invalid access point'
@@ -405,7 +405,6 @@ export class NginxReversedProxy extends AccessPointProvider{
 
     // // Register service runtimes
     let hasRouteTableModified = false
-    let somethingWrong = false
     
     // // update route table
     for (let serviceRuntime of runtimes) {
@@ -431,16 +430,22 @@ export class NginxReversedProxy extends AccessPointProvider{
         }
         let isValidServiceRuntime = true
         const entries: Sardines.Runtime.ServiceEntry[] = []
-    //     let locationCache: {[path:string]:NginxReversedProxyLocationItem} = {}
         for (let p of pathList) {
- 
+          const subentries = this.routetable.registerReversedProxyEntries(accessPoint, p, x.providers, {
+            sourcePath: x.sourcePath,
+            protocol: x.protocol,
+            loadBalance: options.loadBalance||Sardines.Runtime.LoadBalancingStrategy.random
+          }, options.proxyOptions)
+          if (!subentries || !subentries.length) {
+            isValidServiceRuntime = false
+            break
+          } else {
+            Array.prototype.push.apply(entries, subentries)
+          }
         }
         if (!isValidServiceRuntime) {
           throw `service runtime's protocol or root path does not match with current proxy server's protocol or root path`
         } else {
-          // for (let path of Object.keys(locationCache)) {
-          //   server.locations[path] = locationCache[path]
-          // }
           if (!hasRouteTableModified) hasRouteTableModified = true
           const sr: Sardines.Runtime.Service = {
             entries,
@@ -454,7 +459,7 @@ export class NginxReversedProxy extends AccessPointProvider{
       }
     }
 
-    if (hasRouteTableModified && !somethingWrong) {
+    if (hasRouteTableModified) {
       if (actionOptions && actionOptions.restart) {
         await this.restart()
       } else if (actionOptions && actionOptions.writeServerConfigFileWithoutRestart) {
@@ -467,111 +472,73 @@ export class NginxReversedProxy extends AccessPointProvider{
 
   // return the deleted service runtimes on the reverse proxy
   public async removeServiceRuntimes(accessPoint: NginxServer, runtimes: Sardines.Runtime.Service[], options: NginxReversedProxyServiceRuntimeOptions = {isDefaultVersion: false}, actionOptions: NginxServerActionOptions = defaultNginxServerActionOptions):Promise<Sardines.Runtime.Service[]|NginxReversedProxyRouteTable> {
-    return this.routetable
-  //   if (!accessPoint || !accessPoint.interfaces || !accessPoint.interfaces.length || !accessPoint.name) {
-  //     throw `invalid access point`
-  //   }
-  //   await this.routetable.readRouteTable()
-  //   const serverKey = keyOfNginxServer(accessPoint)
-  //   const server = this.routetable.servers.serverCache[serverKey]
-  //   if (!server) {
-  //     throw `access point does not exist`
-  //   }
+    if (!accessPoint || !accessPoint.interfaces || !accessPoint.interfaces.length || !accessPoint.name) {
+      throw `invalid access point`
+    }
+    await this.routetable.readRouteTable()
+    const server = this.routetable.hasServer(accessPoint)
+    if (!server) {
+      throw `access point does not exist`
+    }
 
-  //   const result: Sardines.Runtime.Service[] = []
-  //   let hasRouteTableModified = false
-  //   if (server.locations) {
-  //     for (let runtime of runtimes) {
-  //       try {
-  //         const sr = await validServiceRuntime(runtime, {noEmptyProviders: false, acceptAsteriskVersion: true})
-  //         const entries: Sardines.Runtime.ServiceEntry[] = []
-  //         // get upstream object from server location object
-  //         const defaultRoot = this.rootForServiceRuntime(sr.serviceIdentity,true, options)
-  //         const subpath = this.subPathForServiceRuntime(sr.serviceIdentity)
-  //         let defaultPath = this.pathForServiceRuntime(sr.serviceIdentity, true, options)
-  //         let pathList = [this.pathForServiceRuntime(sr.serviceIdentity, false, options)]
-  //         if (options && options.isDefaultVersion && pathList[0] !== defaultPath) pathList.push(defaultPath)
-  //         if (sr.providers.length) {
-  //           // remove upstream server items one by one
-  //           for (let pvdr of sr.providers) {
-  //             // ignore non-exist providers
-  //             const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
-  //             if (!this.routetable.upstreams.reverseUpstreamCache[pvdrKey]) continue
-  //             for (let path of pathList) {
-  //               // ignore non-exist path
-  //               if (!server.locations[path]) continue
-  //               // remove pvdr from location
-  //               const locationObj = server.locations[path]
-  //               let upstreamName = locationObj.upstream.upstreamName
-  //               let upstreamObj = this.routetable.upstreams.upstreamCache[upstreamName]
-  //               const saved = this.routetable.removeItemFromUpstreamObject(upstreamObj, serverKey, path, pvdr)
-  //               if (!saved) continue
-  //               if (!hasRouteTableModified) hasRouteTableModified = true
-
-  //               if (!this.routetable.servers.serverCache[serverKey].locations[path]) {
-  //                 // console.log('location:',path, 'has been removed in server:', serverKey)
-  //                 for (let inf of server.options.interfaces) {
-  //                   entries.push({
-  //                     type: Sardines.Runtime.ServiceEntryType.proxy,
-  //                     providerInfo: {
-  //                       host: server.options.name,
-  //                       port: inf.port,
-  //                       protocol: (inf.ssl)?NginxReversedProxySupportedProtocol.HTTPS:NginxReversedProxySupportedProtocol.HTTP,
-  //                       root: (path.substr(0, path.indexOf(subpath))+'/').replace(/\/+/g, '/')
-  //                     }
-  //                   })
-  //                 }
-  //               } else {
-  //                 // console.log('non-empty location', path, 'in server:', serverKey,'when process sr:',sr.serviceIdentity, "'s provider:", pvdr,', location object:', utils.inspect(routetable.servers.serverCache[serverKey].locations[path]))
-  //               }
-  //             }
-  //           }
-  //         } else {
-  //           // remove all paths for the service runtime
-  //           for (let location of Object.keys(server.locations)) {
-  //             const regexStr = `${defaultRoot}/[version_place_holder]/${subpath}`
-  //                               .replace(/\/+/g, '/')
-  //                               .replace('[version_place_holder]', '[^/]+')
-  //             const regex = new RegExp(regexStr)
-  //             if (regex.test(location) || location === defaultPath) {
-  //               const upstreamName = server.locations[location].upstream.upstreamName
-  //               const upstreamObj = this.routetable.upstreams.upstreamCache[upstreamName]
-  //               const saved = this.routetable.removeItemFromUpstreamObject(upstreamObj, serverKey, location)
-  //               if (!saved) continue
-  //               for(let inf of server.options.interfaces) {
-  //                 entries.push({
-  //                   type: Sardines.Runtime.ServiceEntryType.proxy,
-  //                   providerInfo: {
-  //                     host: server.options.name,
-  //                     port: inf.port,
-  //                     root: (location.substr(0, location.indexOf(subpath))+'/').replace(/\/+/g, '/'),
-  //                     protocol: inf.ssl?NginxReversedProxySupportedProtocol.HTTPS:NginxReversedProxySupportedProtocol.HTTP
-  //                   }
-  //                 })
-  //               }
-  //               if (!hasRouteTableModified) hasRouteTableModified = true
-  //             }
-  //           }
-  //         }
-  //         if (entries.length) {
-  //           result.push({
-  //             identity: sr.serviceIdentity,
-  //             entries
-  //           })
-  //         }
-  //       } catch (e) {
-  //         console.log('WARNING: error while validating service runtime:', runtime, ', error:', e)
-  //         continue
-  //       }
-  //     }
-  //   }
-  //   // console.log('routetable before update:', utils.inspect(routetable))
-  //   if (hasRouteTableModified && actionOptions && actionOptions.restart) {
-  //     await this.restart()
-  //   } else if (hasRouteTableModified && actionOptions && actionOptions.writeServerConfigFileWithoutRestart) {
-  //     await this.routetable.updateRouteTableFile()
-  //   }
-  //   if (actionOptions && actionOptions.returnRouteTable) return this.routetable
-  //   else return result 
+    const result: Sardines.Runtime.Service[] = []
+    let hasRouteTableModified = false
+    if (server.locations) {
+      for (let runtime of runtimes) {
+        try {
+          const sr = await NginxReversedProxy.validServiceRuntime(runtime, {noEmptyProviders: false, acceptAsteriskVersion: true})
+          const entries: Sardines.Runtime.ServiceEntry[] = []
+          const defaultPath = {
+            path: this.pathForServiceRuntime(sr.serviceIdentity, true, options),
+            root: this.rootForServiceRuntime(sr.serviceIdentity, true, options),
+            isDefault: true
+          }
+          const nonDefaultPath = {
+            path: this.pathForServiceRuntime(sr.serviceIdentity, false, options),
+            root: this.rootForServiceRuntime(sr.serviceIdentity, false, options),
+            isDefault: false
+          }
+          const pathlist = []
+          let isRemovingAllVersions = false
+          if (options.isDefaultVersion) pathlist.push(defaultPath)
+          if (nonDefaultPath.path !== defaultPath.path) pathlist.push(nonDefaultPath) 
+          else isRemovingAllVersions = true
+          for (let p of pathlist) {
+            console.log('==========================')
+            console.log('removing service runtime:',sr.serviceIdentity.version, sr.serviceIdentity.application, sr.serviceIdentity.module, sr.serviceIdentity.name, sr.providers.map(p=>`${p.host}:${p.port}`).join(','))
+            console.log('path:', p)
+            const subentries = this.routetable.removeReversedProxyEntries(accessPoint, p, sr.providers, {
+              sourcePath: sr.sourcePath,
+              protocol: sr.protocol,
+              loadBalance: options.loadBalance || Sardines.Runtime.LoadBalancingStrategy.random,
+              allVersions: isRemovingAllVersions
+            }, options.proxyOptions)
+            console.log('--------------------------')
+            console.log('')
+            if (subentries) {
+              if (!hasRouteTableModified) hasRouteTableModified = true
+              Array.prototype.push.apply(entries, subentries)
+            }
+          }
+          
+          if (entries.length) {
+            result.push({
+              identity: sr.serviceIdentity,
+              entries
+            })
+          }
+        } catch (e) {
+          console.log('WARNING: error while validating service runtime:', runtime, ', error:', e)
+          continue
+        }
+      }
+    }
+    if (hasRouteTableModified && actionOptions && actionOptions.restart) {
+      await this.restart()
+    } else if (hasRouteTableModified && actionOptions && actionOptions.writeServerConfigFileWithoutRestart) {
+      await this.routetable.updateRouteTableFile()
+    }
+    if (actionOptions && actionOptions.returnRouteTable) return this.routetable
+    else return result 
   }
 }

@@ -595,23 +595,24 @@ export class NginxReversedProxyRouteTable {
           loadBalancing: upstreamObj.loadBalancing
         }
       }
-      if (serverKey && location) {
-        if (this.servers && this.servers.serverCache[serverKey] 
-          && this.servers.serverCache[serverKey].locations[location]
-          ) {
-          this.servers.serverCache[serverKey].locations[location].upstream = upstreamObj
-          if (!this.servers.reverseServerCache[upstreamObj.upstreamName]) {
-            this.servers.reverseServerCache[upstreamObj.upstreamName] = {}
+    }
+    if (serverKey && location) {
+      if (this.servers && this.servers.serverCache[serverKey]) {
+        if (!this.servers.serverCache[serverKey].locations[location]) {
+          this.servers.serverCache[serverKey].locations[location] = {}
+        }
+        this.servers.serverCache[serverKey].locations[location].upstream = upstreamObj
+        if (!this.servers.reverseServerCache[upstreamObj.upstreamName]) {
+          this.servers.reverseServerCache[upstreamObj.upstreamName] = {}
+        }
+        if (!this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey]) {
+          this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey] = {
+            locations: [],
+            options: this.servers.serverCache[serverKey].options
           }
-          if (!this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey]) {
-            this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey] = {
-              locations: [],
-              options: this.servers.serverCache[serverKey].options
-            }
-          }
-          if (this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey].locations.indexOf(location)<0) {
-            this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey].locations.push(location)
-          }
+        }
+        if (this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey].locations.indexOf(location)<0) {
+          this.servers.reverseServerCache[upstreamObj.upstreamName][serverKey].locations.push(location)
         }
       }
     }
@@ -651,7 +652,10 @@ export class NginxReversedProxyRouteTable {
       console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', in which reverse server cache item should contains path [', location, '] in its server key', serverKey)
       return hasRouteTableModified
     }
-    if (pvdr) {
+    let pvdrKey = pvdr?`${pvdr.host}${pvdr.port?':'+pvdr.port:''}`:''
+    console.log('')
+    console.log('removing pvdr:', pvdrKey, 'from server:', serverKey, ',location:', location, ', current upstream object:', upstreamObj.upstreamName)
+    if (pvdr && upstream.items.length > 1) {
       // locate the provider item in the location
       let itemIndex = -1
       const port = (pvdr.port)?pvdr.port: (pvdr.protocol.toLowerCase() === 'https')? 443: 80
@@ -663,57 +667,72 @@ export class NginxReversedProxyRouteTable {
         }
       }
       if (itemIndex < 0) return hasRouteTableModified
+      // remove old one reverse server cache as soon as the pvdr is confirmed
+      this.servers.reverseServerCache[upstreamName][serverKey].locations.splice(locationIndexInReversedServerCache,1)
       // duplicate the upstream object, if it is referenced by other locations
-      if (this.servers.reverseServerCache[upstreamName][serverKey].locations.length > 1) {
-        // remove the location in the reverse server cache of the upstream
-        const locationIndex = this.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(location)
-        // remove old one reverse server cache
-        this.servers.reverseServerCache[upstreamName][serverKey].locations.splice(locationIndex,1)
-        let newUpstreamObj = createUpstreamObject(this.servers.serverCache[serverKey].locations[location].upstream)
-        // remove the server item from the upstream obj
-        newUpstreamObj.items.splice(itemIndex,1)
-        // ignore duplication
-        const found = this.findDuplicatedUpstream(newUpstreamObj)
-        if (found) {
-          newUpstreamObj = found
-          // add the new one into the reverse server cache
-          if (!this.servers.reverseServerCache[newUpstreamObj.upstreamName][serverKey]) {
-            this.servers.reverseServerCache[newUpstreamObj.upstreamName][serverKey] = {
-              locations: [],
-              options: this.servers.serverCache[serverKey].options
-            }
+      let references = 0
+      for (let sk of Object.keys(this.servers.reverseServerCache[upstreamName])) {
+        if (this.servers.reverseServerCache[upstreamName][sk].locations) {
+          references += this.servers.reverseServerCache[upstreamName][sk].locations.length
+          if (sk === serverKey && this.servers.reverseServerCache[upstreamName][sk].locations.indexOf(location) >=0) {
+            references--
           }
+        }
+      }
+
+      let newUpstreamObj = upstreamObj
+      if (references > 0) {
+        // remove the location in the reverse server cache of the upstream
+        newUpstreamObj = createUpstreamObject(this.servers.serverCache[serverKey].locations[location].upstream)
+      }
+      // remove the server item from the upstream obj
+      newUpstreamObj.items.splice(itemIndex,1)
+      // remove non-useful pvdr from reverse upstream cache as soon as it is removed from the upstream object
+      if (this.upstreams.reverseUpstreamCache[pvdrKey][upstreamName] && references === 0) {
+        delete this.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]
+      }
+      if (Object.keys(this.upstreams.reverseUpstreamCache[pvdrKey]).length === 0) {
+        console.log('removing empty source server item:', pvdrKey)
+        delete this.upstreams.reverseUpstreamCache[pvdrKey]
+      }
+      if (references>0) {
+        console.log('original upstream name:', upstreamObj.upstreamName, ', newly copied upstream name:', newUpstreamObj.upstreamName, ', original upstream references:', references)
+        console.log('original upstream items count:', upstreamObj.items.length, ', newly copied upstream items count:', newUpstreamObj.items.length)
+      } else {
+        console.log('reusing original upstream item:', upstreamObj.upstreamName, ', really?', upstreamName === newUpstreamObj.upstreamName)
+      }
+      
+      
+      // reuse duplicated upstreams
+      const found = this.findDuplicatedUpstream(newUpstreamObj)
+      console.log('search result for the newly copied upstream:', found)
+      if (found) {
+        newUpstreamObj = found
+        // add this existing upstream into the reverse server cache under the location
+        if (!this.servers.reverseServerCache[newUpstreamObj.upstreamName]) {
+          this.servers.reverseServerCache[newUpstreamObj.upstreamName] = {}
+        }
+        if (!this.servers.reverseServerCache[newUpstreamObj.upstreamName][serverKey]) {
+          this.servers.reverseServerCache[newUpstreamObj.upstreamName][serverKey] = {
+            locations: [],
+            options: this.servers.serverCache[serverKey].options
+          }
+        }
+        if (this.servers.reverseServerCache[newUpstreamObj.upstreamName][serverKey].locations.indexOf(location)<0) {
           this.servers.reverseServerCache[newUpstreamObj.upstreamName][serverKey].locations.push(location)
-        } 
+        }
+      } else {
+        // save new upstream object
         let saved = this.saveUpstreamObject(newUpstreamObj, serverKey, location)
         if (!saved) {
           return hasRouteTableModified
         }
-  
-        // move points to new upstream object
-        upstreamName = newUpstreamObj.upstreamName
-        upstreamObj = newUpstreamObj
       }
-      // remove non-useful pvdr from reverse upstream cache
-      const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
-      if (this.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]) {
-        delete this.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]
-      }
-      if (Object.keys(this.upstreams.reverseUpstreamCache[pvdrKey]).length === 0) {
-        delete this.upstreams.reverseUpstreamCache[pvdrKey]
-      }
-      // remove empty upstream object
-      if (upstreamObj.items.length === 0) {
-        delete this.upstreams.upstreamCache[upstreamName]
-        // remove all locations which reference this upstream
-        for (let s of Object.keys(this.servers.reverseServerCache[upstreamName])) {
-          for (let l of this.servers.reverseServerCache[upstreamName][s].locations) {
-            delete this.servers.serverCache[s].locations[l]
-          }
-        }
-        // remove the upstream in cache
-        delete this.servers.reverseServerCache[upstreamName]
-      }
+      // update current location object
+      this.servers.serverCache[serverKey].locations[location].upstream = newUpstreamObj
+      // move points to new upstream object
+      // upstreamName = newUpstreamObj.upstreamName
+      // upstreamObj = newUpstreamObj
     } else {
       delete this.servers.serverCache[serverKey].locations[location]
       this.servers.reverseServerCache[upstreamName][serverKey].locations.splice(locationIndexInReversedServerCache,1)
@@ -801,7 +820,7 @@ export class NginxReversedProxyRouteTable {
       return result
   }
 
-  registerReversedProxyEntry(
+  registerReversedProxyEntries(
     accessPoint: NginxServer, 
     p: {path: string, root: string, isDefault: boolean}, 
     sourceServers: NginxReversedProxySupprotedProviderInfo[], 
@@ -825,21 +844,9 @@ export class NginxReversedProxyRouteTable {
       locationObj.upstream = x.upstreamItem
       locationObj.upstream.root = options.sourcePath
       if (!this.upstreams.upstreamCache[x.upstreamItem.upstreamName]) {
-        this.upstreams.upstreamCache[x.upstreamItem.upstreamName] = x.upstreamItem
-        // cache items of upstream in reverse cache
-        for (let item of x.upstreamItem.items) {
-          const reverseUpstreamCacheKey = `${item.server}${item.port?':'+item.port:''}`
-          if (!this.upstreams.reverseUpstreamCache[reverseUpstreamCacheKey]) {
-            this.upstreams.reverseUpstreamCache[reverseUpstreamCacheKey] = {}
-          }
-          if (!this.upstreams.reverseUpstreamCache[reverseUpstreamCacheKey][x.upstreamItem.upstreamName]) {
-            this.upstreams.reverseUpstreamCache[reverseUpstreamCacheKey][x.upstreamItem.upstreamName] = {
-              weight: item.weight,
-              loadBalancing: x.upstreamItem.loadBalancing
-            }
-          }
-        }
+        this.saveUpstreamObject(x.upstreamItem, NginxReversedProxyRouteTable.keyOfNginxServer(server), p.path)
       }
+      server.locations[p.path] = locationObj
     } else {
       // update current upstream
       locationObj = server.locations[p.path]
@@ -860,6 +867,16 @@ export class NginxReversedProxyRouteTable {
           const reverseUpstreamCacheItem = this.upstreams.reverseUpstreamCache[reverseUpstreamCacheKey]
           if (!reverseUpstreamCacheItem || !reverseUpstreamCacheItem[upstreamName]) {
             upstreamObj.items.push(item)
+            const itemKey = `${item.server}${item.port?':'+item.port:''}`
+            if (!this.upstreams.reverseUpstreamCache[itemKey]) {
+              this.upstreams.reverseUpstreamCache[itemKey] = {}
+            }
+            if (!this.upstreams.reverseUpstreamCache[itemKey][upstreamObj.upstreamName]) {
+              this.upstreams.reverseUpstreamCache[itemKey][upstreamObj.upstreamName] = {
+                weight: item.weight,
+                loadBalancing: upstreamObj.loadBalancing
+              }
+            }
           }
         }
       }            
@@ -879,6 +896,92 @@ export class NginxReversedProxyRouteTable {
         }
       })
     }
+    return entries
+  }
+
+  removeReversedProxyEntries(accessPoint: NginxServer, 
+    p: {path: string, root: string, isDefault: boolean}, 
+    sourceServers: NginxReversedProxySupprotedProviderInfo[], 
+    options: {sourcePath: string, loadBalance: Sardines.Runtime.LoadBalancingStrategy, protocol: NginxReversedProxySupportedProtocol, allVersions: boolean},
+    proxyOptions: NginxServerProxyOptions): Sardines.Runtime.ServiceEntry[] {
+    
+    // remove upstream server items one by one
+    let hasRouteTableModified = false
+    const server = this.hasServer(accessPoint)
+    const serverKey = NginxReversedProxyRouteTable.keyOfNginxServer(accessPoint)
+    const entries: Sardines.Runtime.ServiceEntry[] = []
+    if (sourceServers.length) {
+      for (let pvdr of sourceServers) {
+        // ignore non-exist providers
+        const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
+        if (!this.upstreams.reverseUpstreamCache[pvdrKey]) {
+          console.log('WARNING: there is no source server item in the routetable:', pvdrKey)
+          continue
+        }
+        // ignore non-exist path
+        if (!server.locations[p.path]) continue
+        // remove pvdr from location
+        const locationObj = server.locations[p.path]
+        let upstreamName = locationObj.upstream.upstreamName
+        let upstreamObj = this.upstreams.upstreamCache[upstreamName]
+        const saved = this.removeItemFromUpstreamObject(upstreamObj, serverKey, p.path, pvdr)
+        if (!saved) continue
+        if (!hasRouteTableModified) hasRouteTableModified = true
+
+        if (!this.servers.serverCache[serverKey].locations[p.path]) {
+          // console.log('location:',path, 'has been removed in server:', serverKey)
+          for (let inf of server.options.interfaces) {
+            entries.push({
+              type: Sardines.Runtime.ServiceEntryType.proxy,
+              providerInfo: {
+                host: server.options.name,
+                port: inf.port,
+                protocol: (inf.ssl)?NginxReversedProxySupportedProtocol.HTTPS:NginxReversedProxySupportedProtocol.HTTP,
+                root: (p.path.substr(0, p.path.indexOf(options.sourcePath))+'/').replace(/\/+/g, '/')
+              }
+            })
+          }
+        } else {
+          // console.log('non-empty location', path, 'in server:', serverKey,'when process sr:',sr.serviceIdentity, "'s provider:", pvdr,', location object:', utils.inspect(routetable.servers.serverCache[serverKey].locations[path]))
+        }
+      }
+    } else {
+
+      // remove all paths for the service runtime
+      const candidateLocations = []
+      if (options.allVersions) {
+        for (let location of Object.keys(server.locations)) {
+          const regexStr = `${p.root}/[version_place_holder]/${options.sourcePath}`
+                            .replace(/\/+/g, '/')
+                            .replace('[version_place_holder]', '[^/]+')
+          const regex = new RegExp(regexStr)
+          if (regex.test(location) || location === p.path) {
+            candidateLocations.push(location)
+          }
+        }
+      } else {
+        candidateLocations.push(p.path)
+      }
+      for (let location of candidateLocations) {
+        const upstreamName = server.locations[location].upstream.upstreamName
+          const upstreamObj = this.upstreams.upstreamCache[upstreamName]
+          const saved = this.removeItemFromUpstreamObject(upstreamObj, serverKey, location)
+          if (!saved) continue
+          for(let inf of server.options.interfaces) {
+            entries.push({
+              type: Sardines.Runtime.ServiceEntryType.proxy,
+              providerInfo: {
+                host: server.options.name,
+                port: inf.port,
+                root: (location.substr(0, location.indexOf(options.sourcePath))+'/').replace(/\/+/g, '/'),
+                protocol: inf.ssl?NginxReversedProxySupportedProtocol.HTTPS:NginxReversedProxySupportedProtocol.HTTP
+              }
+            })
+          }
+          if (!hasRouteTableModified) hasRouteTableModified = true
+      }
+    }
+    if (!hasRouteTableModified) return null
     return entries
   }
 }

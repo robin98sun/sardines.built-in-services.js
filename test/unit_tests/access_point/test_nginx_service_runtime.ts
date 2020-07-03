@@ -143,7 +143,7 @@ describe('[nginx] service runtime', async () => {
     await newRoutetable.readRouteTable()
     expect(utils.isEqual(routetable, newRoutetable)).to.be.false
     checkRouteTable(newRoutetable, 2)
-    // console.log(utils.inspect(newRoutetable))
+    console.log(utils.inspect(newRoutetable))
 
   })
 })
