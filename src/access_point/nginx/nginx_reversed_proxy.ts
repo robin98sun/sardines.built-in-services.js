@@ -151,12 +151,14 @@ const getServerConfDir = (configServer: string) => {
 export interface NginxServerActionOptions {
   restart?: boolean, 
   returnRouteTable?: boolean, 
-  writeServerConfigFileWithoutRestart?: boolean
+  writeServerConfigFileWithoutRestart?: boolean,
+  verbose?: boolean
 } 
 export const defaultNginxServerActionOptions: NginxServerActionOptions = {
   restart: true, 
   returnRouteTable: false, 
-  writeServerConfigFileWithoutRestart: false
+  writeServerConfigFileWithoutRestart: false,
+  verbose: false
 }
 
 export interface NginxReversedProxySupportedServiceRuntime {
@@ -504,17 +506,22 @@ export class NginxReversedProxy extends AccessPointProvider{
           if (nonDefaultPath.path !== defaultPath.path) pathlist.push(nonDefaultPath) 
           else isRemovingAllVersions = true
           for (let p of pathlist) {
-            console.log('==========================')
-            console.log('removing service runtime:',sr.serviceIdentity.version, sr.serviceIdentity.application, sr.serviceIdentity.module, sr.serviceIdentity.name, sr.providers.map(p=>`${p.host}:${p.port}`).join(','))
-            console.log('path:', p)
+            if (actionOptions.verbose) {
+              console.log('==========================')
+              console.log('removing service runtime:',sr.serviceIdentity.version, sr.serviceIdentity.application, sr.serviceIdentity.module, sr.serviceIdentity.name, sr.providers.map(p=>`${p.host}:${p.port}`).join(','))
+              console.log('path:', p)
+            }
+            
             const subentries = this.routetable.removeReversedProxyEntries(accessPoint, p, sr.providers, {
               sourcePath: sr.sourcePath,
               protocol: sr.protocol,
               loadBalance: options.loadBalance || Sardines.Runtime.LoadBalancingStrategy.random,
               allVersions: isRemovingAllVersions
-            }, options.proxyOptions)
-            console.log('--------------------------')
-            console.log('')
+            }, actionOptions.verbose)
+            if (actionOptions.verbose) {
+              console.log('--------------------------')
+              console.log('')
+            }
             if (subentries) {
               if (!hasRouteTableModified) hasRouteTableModified = true
               Array.prototype.push.apply(entries, subentries)

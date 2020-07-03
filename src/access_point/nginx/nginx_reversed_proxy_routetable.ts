@@ -620,7 +620,7 @@ export class NginxReversedProxyRouteTable {
     return hasRouteTableModified
   }
 
-  async removeItemFromUpstreamObject ( upstream : NginxReversedProxyUpstreamCacheItem, serverKey: string, location: string, pvdr: NginxReversedProxySupprotedProviderInfo|null = null) {
+  async removeItemFromUpstreamObject ( upstream : NginxReversedProxyUpstreamCacheItem, serverKey: string, location: string, pvdr: NginxReversedProxySupprotedProviderInfo|null = null, verbose:boolean = false) {
     let upstreamObj = upstream
     let hasRouteTableModified = false
     if (!upstreamObj || !upstreamObj.upstreamName || !serverKey || !location) return hasRouteTableModified
@@ -630,31 +630,33 @@ export class NginxReversedProxyRouteTable {
     const locationObj = this.servers.serverCache[serverKey].locations[location]
     // ignore invalid location
     if (!locationObj.upstream) {
-      console.log('WARNING: routetable structure is broken at server [', serverKey,'], location: [', location,'], which should has a valid upstream object')
+      if (verbose) console.log('WARNING: routetable structure is broken at server [', serverKey,'], location: [', location,'], which should has a valid upstream object')
       return hasRouteTableModified
     }
     if (!this.upstreams.upstreamCache[upstreamObj.upstreamName]) {
-      console.log('WARNING: routetable structure is broken in its upstream cache, which should contain upstream named:', upstreamObj.upstreamName)
+      if (verbose) console.log('WARNING: routetable structure is broken in its upstream cache, which should contain upstream named:', upstreamObj.upstreamName)
       return hasRouteTableModified
     }
     let upstreamName = upstreamObj.upstreamName
     // check the reverse server cache of the upstream
     if (!this.servers.reverseServerCache[upstreamName]) {
-      console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', which does not exist in the reverse sever cache')
+      if (verbose) console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', which does not exist in the reverse sever cache')
       return hasRouteTableModified
     }
     if (!this.servers.reverseServerCache[upstreamName][serverKey]) {
-      console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', which reverse server cache item should contains server key:', serverKey)
+      if (verbose) console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', which reverse server cache item should contains server key:', serverKey)
       return hasRouteTableModified
     }
     const locationIndexInReversedServerCache = this.servers.reverseServerCache[upstreamName][serverKey].locations.indexOf(location)
     if (locationIndexInReversedServerCache < 0){
-      console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', in which reverse server cache item should contains path [', location, '] in its server key', serverKey)
+      if (verbose) console.log('WARNING: routetable structure is broken for upstream:', upstreamName, ', in which reverse server cache item should contains path [', location, '] in its server key', serverKey)
       return hasRouteTableModified
     }
     let pvdrKey = pvdr?`${pvdr.host}${pvdr.port?':'+pvdr.port:''}`:''
-    console.log('')
-    console.log('removing pvdr:', pvdrKey, 'from server:', serverKey, ',location:', location, ', current upstream object:', upstreamObj.upstreamName)
+    if (verbose) {
+      console.log('')
+      console.log('removing pvdr:', pvdrKey, 'from server:', serverKey, ',location:', location, ', current upstream object:', upstreamObj.upstreamName)
+    }
     if (pvdr && upstream.items.length > 1) {
       // locate the provider item in the location
       let itemIndex = -1
@@ -692,20 +694,22 @@ export class NginxReversedProxyRouteTable {
         delete this.upstreams.reverseUpstreamCache[pvdrKey][upstreamName]
       }
       if (Object.keys(this.upstreams.reverseUpstreamCache[pvdrKey]).length === 0) {
-        console.log('removing empty source server item:', pvdrKey)
+        if (verbose) console.log('removing empty source server item:', pvdrKey)
         delete this.upstreams.reverseUpstreamCache[pvdrKey]
       }
-      if (references>0) {
-        console.log('original upstream name:', upstreamObj.upstreamName, ', newly copied upstream name:', newUpstreamObj.upstreamName, ', original upstream references:', references)
-        console.log('original upstream items count:', upstreamObj.items.length, ', newly copied upstream items count:', newUpstreamObj.items.length)
-      } else {
-        console.log('reusing original upstream item:', upstreamObj.upstreamName, ', really?', upstreamName === newUpstreamObj.upstreamName)
+      if (verbose) {
+        if (references>0) {
+          console.log('original upstream name:', upstreamObj.upstreamName, ', newly copied upstream name:', newUpstreamObj.upstreamName, ', original upstream references:', references)
+          console.log('original upstream items count:', upstreamObj.items.length, ', newly copied upstream items count:', newUpstreamObj.items.length)
+        } else {
+          console.log('reusing original upstream item:', upstreamObj.upstreamName, ', really?', upstreamName === newUpstreamObj.upstreamName)
+        }
       }
       
       
       // reuse duplicated upstreams
       const found = this.findDuplicatedUpstream(newUpstreamObj)
-      console.log('search result for the newly copied upstream:', found)
+      if (verbose) console.log('search result for the newly copied upstream:', found)
       if (found) {
         newUpstreamObj = found
         // add this existing upstream into the reverse server cache under the location
@@ -744,25 +748,25 @@ export class NginxReversedProxyRouteTable {
         const serverCache = this.servers.reverseServerCache[upstreamName][s]
         if (!serverCache.locations || !serverCache.locations.length) {
           delete this.servers.reverseServerCache[upstreamName][s]
-          // console.log('empty server', s, 'in reverse server cache for upstream', upstreamName, 'has been removed')
+          if (verbose) console.log('empty server', s, 'in reverse server cache for upstream', upstreamName, 'has been removed')
         }
       }
       if (Object.keys(this.servers.reverseServerCache[upstreamName]).length === 0) {
         delete this.servers.reverseServerCache[upstreamName]
-        // console.log('empty upstream item', upstreamName, 'in the reverse server cache has been removed')
+        if (verbose) console.log('empty upstream item', upstreamName, 'in the reverse server cache has been removed')
         for (let item of upstreamObj.items) {
           const itemKey = `${item.server}${item.port?':'+item.port:''}`
           if (this.upstreams.reverseUpstreamCache[itemKey] && this.upstreams.reverseUpstreamCache[itemKey][upstreamName]) {
             delete this.upstreams.reverseUpstreamCache[itemKey][upstreamName]
-            // console.log('empty upstream', upstreamName, 'has been removed from its reverse upstream cache for pvdr item:', itemKey)
+            if (verbose) console.log('empty upstream', upstreamName, 'has been removed from its reverse upstream cache for pvdr item:', itemKey)
           }
           if (!Object.keys(this.upstreams.reverseUpstreamCache[itemKey]).length) {
             delete this.upstreams.reverseUpstreamCache[itemKey]
-            // console.log('empty pvdr item', itemKey, 'has been removed in the reverse upstream cache')
+            if (verbose) console.log('empty pvdr item', itemKey, 'has been removed in the reverse upstream cache')
           }
         }
         delete this.upstreams.upstreamCache[upstreamName]
-        // console.log('empty upstream item', upstreamName, 'has been removed')
+        if (verbose) console.log('empty upstream item', upstreamName, 'has been removed')
       }
     }
   
@@ -903,7 +907,7 @@ export class NginxReversedProxyRouteTable {
     p: {path: string, root: string, isDefault: boolean}, 
     sourceServers: NginxReversedProxySupprotedProviderInfo[], 
     options: {sourcePath: string, loadBalance: Sardines.Runtime.LoadBalancingStrategy, protocol: NginxReversedProxySupportedProtocol, allVersions: boolean},
-    proxyOptions: NginxServerProxyOptions): Sardines.Runtime.ServiceEntry[] {
+    verbose: boolean = false): Sardines.Runtime.ServiceEntry[] {
     
     // remove upstream server items one by one
     let hasRouteTableModified = false
@@ -915,7 +919,8 @@ export class NginxReversedProxyRouteTable {
         // ignore non-exist providers
         const pvdrKey = `${pvdr.host}${pvdr.port?':'+pvdr.port:''}`
         if (!this.upstreams.reverseUpstreamCache[pvdrKey]) {
-          console.log('WARNING: there is no source server item in the routetable:', pvdrKey)
+          if (verbose) 
+            console.log('WARNING: there is no source server item in the routetable:', pvdrKey)
           continue
         }
         // ignore non-exist path
@@ -929,7 +934,7 @@ export class NginxReversedProxyRouteTable {
         if (!hasRouteTableModified) hasRouteTableModified = true
 
         if (!this.servers.serverCache[serverKey].locations[p.path]) {
-          // console.log('location:',path, 'has been removed in server:', serverKey)
+          if(verbose) console.log('location:', p.path, 'has been removed in server:', serverKey)
           for (let inf of server.options.interfaces) {
             entries.push({
               type: Sardines.Runtime.ServiceEntryType.proxy,
@@ -942,7 +947,7 @@ export class NginxReversedProxyRouteTable {
             })
           }
         } else {
-          // console.log('non-empty location', path, 'in server:', serverKey,'when process sr:',sr.serviceIdentity, "'s provider:", pvdr,', location object:', utils.inspect(routetable.servers.serverCache[serverKey].locations[path]))
+          // if(verbose) console.log('non-empty location', path, 'in server:', serverKey,'when process sr:',sr.serviceIdentity, "'s provider:", pvdr,', location object:', utils.inspect(routetable.servers.serverCache[serverKey].locations[path]))
         }
       }
     } else {
